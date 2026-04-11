@@ -1734,6 +1734,32 @@ INSERT INTO `UpdateInventory` (`ItemID`, `StorekeeperEmail`, `Action`, `Timestam
 (244, 'smccrystal0@google.nl', 'Restock', '2025-12-31 00:00:00'),
 (245, 'smccrystal0@google.nl', 'Restock', '2025-12-16 00:00:00');
 
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `AdminDataOperation`
+--
+
+CREATE TABLE `AdminDataOperation` (
+  `OperationID` bigint NOT NULL AUTO_INCREMENT,
+  `StorekeeperEmail` varchar(255) NOT NULL,
+  `OperationType` enum('import','export') NOT NULL,
+  `EntityType` enum('inventory','transactions') NOT NULL,
+  `DataFormat` enum('csv','json','xml','html') NOT NULL,
+  `Status` enum('pending','success','failed') NOT NULL DEFAULT 'pending',
+  `SourceFilename` varchar(255) DEFAULT NULL,
+  `RequestedAt` datetime NOT NULL DEFAULT current_timestamp(),
+  `CompletedAt` datetime DEFAULT NULL,
+  `Notes` varchar(500) DEFAULT NULL,
+  PRIMARY KEY (`OperationID`),
+  KEY `idx_adminop_storekeeper_requested` (`StorekeeperEmail`, `RequestedAt`),
+  KEY `idx_adminop_status` (`Status`),
+  KEY `idx_adminop_type_entity` (`OperationType`, `EntityType`),
+  CONSTRAINT `fk_adminop_storekeeper`
+    FOREIGN KEY (`StorekeeperEmail`) REFERENCES `Storekeeper_R1` (`Email`)
+    ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 --
 -- Indexes for dumped tables
 --
@@ -1770,7 +1796,18 @@ ALTER TABLE `ItemRequest`
 -- Indexes for table `Item_R1`
 --
 ALTER TABLE `Item_R1`
-  ADD PRIMARY KEY (`ItemID`);
+  ADD PRIMARY KEY (`ItemID`),
+  ADD COLUMN `SKU` varchar(64) NULL AFTER `ItemID`;
+
+UPDATE `Item_R1`
+SET `SKU` = CONCAT('KM-', LPAD(`ItemID`, 6, '0'))
+WHERE `SKU` IS NULL;
+
+ALTER TABLE `Item_R1`
+  MODIFY `SKU` varchar(64) NOT NULL,
+  ADD UNIQUE KEY `uq_item_r1_sku` (`SKU`),
+  ADD CONSTRAINT `chk_item_r1_quantity_nonnegative` CHECK (`Quantity` >= 0),
+  ADD CONSTRAINT `chk_item_r1_price_nonnegative` CHECK (`Price` >= 0);
 
 --
 -- Indexes for table `Item_R2`
