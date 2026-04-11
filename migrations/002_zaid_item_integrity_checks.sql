@@ -1,5 +1,5 @@
 -- DOCUMENTATION ONLY - DO NOT EXECUTE
--- Canonical schema is now maintained directly in `hgr9ba_b.sql`.
+-- Main schema file is now maintained directly in `hgr9ba_b.sql`.
 -- This file is kept only as historical notes for the SQL optimization sprint.
 --
 -- Kings Market SQL Optimization Sprint (Zaid scope)

@@ -1754,10 +1754,7 @@ CREATE TABLE `AdminDataOperation` (
   PRIMARY KEY (`OperationID`),
   KEY `idx_adminop_storekeeper_requested` (`StorekeeperEmail`, `RequestedAt`),
   KEY `idx_adminop_status` (`Status`),
-  KEY `idx_adminop_type_entity` (`OperationType`, `EntityType`),
-  CONSTRAINT `fk_adminop_storekeeper`
-    FOREIGN KEY (`StorekeeperEmail`) REFERENCES `Storekeeper_R1` (`Email`)
-    ON DELETE RESTRICT
+  KEY `idx_adminop_type_entity` (`OperationType`, `EntityType`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
@@ -1898,6 +1895,12 @@ ALTER TABLE `PaymentInfo`
 --
 ALTER TABLE `Storekeeper_R2`
   ADD CONSTRAINT `fk_storekeeper_r2_r1` FOREIGN KEY (`Email`) REFERENCES `Storekeeper_R1` (`Email`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `AdminDataOperation`
+--
+ALTER TABLE `AdminDataOperation`
+  ADD CONSTRAINT `fk_adminop_storekeeper` FOREIGN KEY (`StorekeeperEmail`) REFERENCES `Storekeeper_R1` (`Email`) ON DELETE RESTRICT;
 
 --
 -- Constraints for table `UpdateCart`
