@@ -1758,6 +1758,15 @@ CREATE TABLE `AdminDataOperation` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
+-- Dumping data for table `AdminDataOperation`
+--
+
+INSERT INTO `AdminDataOperation` (`OperationID`, `StorekeeperEmail`, `OperationType`, `EntityType`, `DataFormat`, `Status`, `SourceFilename`, `RequestedAt`, `CompletedAt`, `Notes`) VALUES
+(1, 'edymoke2@hatena.ne.jp', 'import', 'inventory', 'csv', 'success', 'inventory_import_batch1.csv', '2026-03-15 10:05:00', '2026-03-15 10:06:00', 'Initial inventory import'),
+(2, 'smccrystal0@google.nl', 'export', 'transactions', 'json', 'success', 'transactions_export_mar16.json', '2026-03-16 14:20:00', '2026-03-16 14:20:30', 'Prepared report for review'),
+(3, 'mjaze1@unicef.org', 'import', 'inventory', 'csv', 'failed', 'inventory_import_batch2.csv', '2026-03-17 09:10:00', '2026-03-17 09:11:00', 'One or more rows failed validation');
+
+--
 -- Indexes for dumped tables
 --
 
