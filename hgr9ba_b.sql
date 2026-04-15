@@ -36,7 +36,7 @@ CREATE TABLE `CustomerOrder` (
   `OrderID` int(11) NOT NULL,
   `CustomerEmail` varchar(255) NOT NULL,
   `Timestamp` datetime NOT NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci; -- should be same collation for ALL tables in the db, otherwise issues with keys.
 
 --
 -- Dumping data for table `CustomerOrder`
