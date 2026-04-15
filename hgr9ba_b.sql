@@ -21,11 +21,16 @@ SET time_zone = "+00:00";
 -- Database: `hgr9ba_b`
 --
 
+-- CREATE DATABASE hgr9ba_b
+--   CHARACTER SET utf8mb4
+--   COLLATE utf8mb4_general_ci;
 -- --------------------------------------------------------
+
 
 --
 -- Table structure for table `CustomerOrder`
 --
+
 
 CREATE TABLE `CustomerOrder` (
   `OrderID` int(11) NOT NULL,
@@ -1891,8 +1896,7 @@ ALTER TABLE `ItemRequest`
 --
 ALTER TABLE `OrderItem`
   ADD CONSTRAINT `fk_orderitem_item` FOREIGN KEY (`ItemID`) REFERENCES `Item_R1` (`ItemID`),
-  ADD CONSTRAINT `fk_orderitem_order` FOREIGN KEY (`OrderID`,`CustomerEmail`) REFERENCES `CustomerOrder` (`OrderID`, `CustomerEmail`) ON DELETE CASCADE;
-
+  ADD CONSTRAINT `fk_orderitem_order` FOREIGN KEY (`OrderID`, `CustomerEmail`) REFERENCES `CustomerOrder` (`OrderID`, `CustomerEmail`) ON DELETE CASCADE;
 --
 -- Constraints for table `PaymentInfo`
 --
