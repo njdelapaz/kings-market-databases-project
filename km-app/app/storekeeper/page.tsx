@@ -39,8 +39,8 @@ export default function Dashboard() {
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 p-4 md:p-8">
-            <div className="max-w-8xl mx-auto">
+        <div className="min-h-screen bg-indigo-600 p-4 md:p-8">
+            <div className="max-w-6xl mx-auto">
                 {/* Header Card */}
                 <div className="bg-white rounded-2xl shadow-sm p-8 border border-slate-200 mb-8 flex justify-between">
                     <h1 className="mt-2 p-3 text-slate-600">
