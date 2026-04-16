@@ -21,17 +21,22 @@ SET time_zone = "+00:00";
 -- Database: `hgr9ba_b`
 --
 
+-- CREATE DATABASE hgr9ba_b
+--   CHARACTER SET utf8mb4
+--   COLLATE utf8mb4_general_ci;
 -- --------------------------------------------------------
+
 
 --
 -- Table structure for table `CustomerOrder`
 --
 
+
 CREATE TABLE `CustomerOrder` (
   `OrderID` int(11) NOT NULL,
   `CustomerEmail` varchar(255) NOT NULL,
   `Timestamp` datetime NOT NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci; -- should be same collation for ALL tables in the db, otherwise issues with keys.
 
 --
 -- Dumping data for table `CustomerOrder`
@@ -1734,6 +1739,38 @@ INSERT INTO `UpdateInventory` (`ItemID`, `StorekeeperEmail`, `Action`, `Timestam
 (244, 'smccrystal0@google.nl', 'Restock', '2025-12-31 00:00:00'),
 (245, 'smccrystal0@google.nl', 'Restock', '2025-12-16 00:00:00');
 
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `AdminDataOperation`
+--
+
+CREATE TABLE `AdminDataOperation` (
+  `OperationID` bigint NOT NULL AUTO_INCREMENT,
+  `StorekeeperEmail` varchar(255) NOT NULL,
+  `OperationType` enum('import','export') NOT NULL,
+  `EntityType` enum('inventory','transactions') NOT NULL,
+  `DataFormat` enum('csv','json','xml','html') NOT NULL,
+  `Status` enum('pending','success','failed') NOT NULL DEFAULT 'pending',
+  `SourceFilename` varchar(255) DEFAULT NULL,
+  `RequestedAt` datetime NOT NULL DEFAULT current_timestamp(),
+  `CompletedAt` datetime DEFAULT NULL,
+  `Notes` varchar(500) DEFAULT NULL,
+  PRIMARY KEY (`OperationID`),
+  KEY `idx_adminop_storekeeper_requested` (`StorekeeperEmail`, `RequestedAt`),
+  KEY `idx_adminop_status` (`Status`),
+  KEY `idx_adminop_type_entity` (`OperationType`, `EntityType`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `AdminDataOperation`
+--
+
+INSERT INTO `AdminDataOperation` (`OperationID`, `StorekeeperEmail`, `OperationType`, `EntityType`, `DataFormat`, `Status`, `SourceFilename`, `RequestedAt`, `CompletedAt`, `Notes`) VALUES
+(1, 'edymoke2@hatena.ne.jp', 'import', 'inventory', 'csv', 'success', 'inventory_import_batch1.csv', '2026-03-15 10:05:00', '2026-03-15 10:06:00', 'Initial inventory import'),
+(2, 'smccrystal0@google.nl', 'export', 'transactions', 'json', 'success', 'transactions_export_mar16.json', '2026-03-16 14:20:00', '2026-03-16 14:20:30', 'Prepared report for review'),
+(3, 'mjaze1@unicef.org', 'import', 'inventory', 'csv', 'failed', 'inventory_import_batch2.csv', '2026-03-17 09:10:00', '2026-03-17 09:11:00', 'One or more rows failed validation');
+
 --
 -- Indexes for dumped tables
 --
@@ -1770,7 +1807,18 @@ ALTER TABLE `ItemRequest`
 -- Indexes for table `Item_R1`
 --
 ALTER TABLE `Item_R1`
-  ADD PRIMARY KEY (`ItemID`);
+  ADD PRIMARY KEY (`ItemID`),
+  ADD COLUMN `SKU` varchar(64) NULL AFTER `ItemID`;
+
+UPDATE `Item_R1`
+SET `SKU` = CONCAT('KM-', LPAD(`ItemID`, 6, '0'))
+WHERE `SKU` IS NULL;
+
+ALTER TABLE `Item_R1`
+  MODIFY `SKU` varchar(64) NOT NULL,
+  ADD UNIQUE KEY `uq_item_r1_sku` (`SKU`),
+  ADD CONSTRAINT `chk_item_r1_quantity_nonnegative` CHECK (`Quantity` >= 0),
+  ADD CONSTRAINT `chk_item_r1_price_nonnegative` CHECK (`Price` >= 0);
 
 --
 -- Indexes for table `Item_R2`
@@ -1848,8 +1896,7 @@ ALTER TABLE `ItemRequest`
 --
 ALTER TABLE `OrderItem`
   ADD CONSTRAINT `fk_orderitem_item` FOREIGN KEY (`ItemID`) REFERENCES `Item_R1` (`ItemID`),
-  ADD CONSTRAINT `fk_orderitem_order` FOREIGN KEY (`OrderID`,`CustomerEmail`) REFERENCES `CustomerOrder` (`OrderID`, `CustomerEmail`) ON DELETE CASCADE;
-
+  ADD CONSTRAINT `fk_orderitem_order` FOREIGN KEY (`OrderID`, `CustomerEmail`) REFERENCES `CustomerOrder` (`OrderID`, `CustomerEmail`) ON DELETE CASCADE;
 --
 -- Constraints for table `PaymentInfo`
 --
@@ -1861,6 +1908,12 @@ ALTER TABLE `PaymentInfo`
 --
 ALTER TABLE `Storekeeper_R2`
   ADD CONSTRAINT `fk_storekeeper_r2_r1` FOREIGN KEY (`Email`) REFERENCES `Storekeeper_R1` (`Email`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `AdminDataOperation`
+--
+ALTER TABLE `AdminDataOperation`
+  ADD CONSTRAINT `fk_adminop_storekeeper` FOREIGN KEY (`StorekeeperEmail`) REFERENCES `Storekeeper_R1` (`Email`) ON DELETE RESTRICT;
 
 --
 -- Constraints for table `UpdateCart`
