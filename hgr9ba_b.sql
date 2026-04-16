@@ -1780,7 +1780,8 @@ INSERT INTO `AdminDataOperation` (`OperationID`, `StorekeeperEmail`, `OperationT
 --
 ALTER TABLE `CustomerOrder`
   ADD PRIMARY KEY (`OrderID`,`CustomerEmail`),
-  ADD KEY `fk_customerorder_customer` (`CustomerEmail`);
+  ADD KEY `fk_customerorder_customer` (`CustomerEmail`),
+  ADD KEY `idx_customerorder_email_ts` (`CustomerEmail`, `Timestamp`); -- covers paginated/sorted order history per user without full scan
 
 --
 -- Indexes for table `Customer_R1`
@@ -1928,6 +1929,35 @@ ALTER TABLE `UpdateCart`
 ALTER TABLE `UpdateInventory`
   ADD CONSTRAINT `fk_updateinventory_item` FOREIGN KEY (`ItemID`) REFERENCES `Item_R1` (`ItemID`),
   ADD CONSTRAINT `fk_updateinventory_storekeeper` FOREIGN KEY (`StorekeeperEmail`) REFERENCES `Storekeeper_R1` (`Email`) ON DELETE CASCADE;
+
+CREATE OR REPLACE VIEW `vw_customer_profile` AS
+SELECT
+  r1.`Email`,
+  r2.`Username`,
+  r1.`PhoneNumber`
+FROM `Customer_R1` r1
+JOIN `Customer_R2` r2 ON r2.`Email` = r1.`Email`;
+
+
+CREATE OR REPLACE VIEW `vw_order_history` AS
+SELECT
+  co.`CustomerEmail`,
+  co.`OrderID`,
+  co.`Timestamp`        AS `OrderTimestamp`,
+  NULL                  AS `OrderStatus`,          -- placeholder: Shrikar sprint task
+  oi.`ItemID`,
+  ir1.`SKU`             AS `ItemSKU`,
+  oi.`Quantity`         AS `OrderedQuantity`,
+  ir1.`Name`            AS `ItemName`,
+  ir1.`Price`           AS `UnitPrice`,             -- current price, not price at order time
+  ir2.`Category`        AS `ItemCategory`,
+  ir1.`IsSelling`       AS `ItemStillAvailable`
+FROM `CustomerOrder` co
+JOIN `OrderItem`    oi  ON oi.`OrderID`      = co.`OrderID`
+                       AND oi.`CustomerEmail` = co.`CustomerEmail`
+JOIN `Item_R1`      ir1 ON ir1.`ItemID`       = oi.`ItemID`
+LEFT JOIN `Item_R2` ir2 ON ir2.`Name`         = ir1.`Name`;
+
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
