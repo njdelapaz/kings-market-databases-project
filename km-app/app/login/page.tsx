@@ -1,17 +1,31 @@
 'use client'
 
 import React, {useState} from 'react';
+import { useRouter } from 'next/navigation';
+
+
 // Assuming role, username, email, setRole, setUsername, setEmail, and error are passed as props or managed via state above
 export default function LoginPage() {
+
+    const router = useRouter();
+
+    // roles, username, email, and error variables.
     const [role, setRole] = useState('customer');
     const [error, setError] = useState('');
     const [email, setEmail] = useState('');
     const [username, setUsername] = useState('');
-    const [result, setResult] = useState('');
+
+
+
 
     async function handleSubmit(e) {
         e.preventDefault();
         setError('');
+        const params = new URLSearchParams({
+            name: username,
+            email: email,
+            role: role
+        });
 
         const res = await fetch('/api/auth/login', {
             method: 'POST',
@@ -22,6 +36,8 @@ export default function LoginPage() {
         const data = await res.json();
         if (data.success) {
             console.log(`Logged In As ${role}!`);
+            // redirect user to dashboard for items.
+            router.push(`/${role}?name=${username}`);
         } else {
             setError(data.error);
         }
