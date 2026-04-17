@@ -5,7 +5,7 @@ export async function GET(request){
     // function to get all the items in the DB and display them.
     try{
         const [rows] = await db.query(
-            `SELECT Name, Quantity, Price, IsSelling
+            `SELECT ItemID, Name, Quantity, Price, IsSelling
             FROM Item_R1
             WHERE Quantity > 0
             AND IsSelling = 1`,
