@@ -22,4 +22,10 @@ Database Systems class project for Kings Market: a pre-order and pickup workflow
 
 ## to run cloud proxy
 download cloud proxy to somewhere
-run it with this: `.\cloud-sql-proxy.exe kings-market-491600:us-east4:kings-market-db --port 3306`
+run it with this:
+
+for windows: `.\cloud-sql-proxy.exe kings-market-491600:us-east4:kings-market-db --port 3306`
+
+for macOS: `./cloud-sql-proxy kings-market-491600:us-east4:kings-market-db --port 3306`
+
+for linux: `idk man good luck`
