@@ -34,17 +34,15 @@ ALTER TABLE `Storekeeper_R2`
 ALTER TABLE `Item_R2`
   ADD PRIMARY KEY (`Name`);
 
--- Item_R1: set PK, generate SKU, add unique key + CHECK constraints
+-- Item_R1: set PK, auto-generate SKU from ItemID, add unique key + CHECK constraints
+-- SKU is a STORED generated column so inserts never need to specify it
+-- and the unique constraint is satisfied automatically.
 ALTER TABLE `Item_R1`
   ADD PRIMARY KEY (`ItemID`),
-  ADD COLUMN `SKU` varchar(64) NULL AFTER `ItemID`;
-
-UPDATE `Item_R1`
-SET `SKU` = CONCAT('KM-', LPAD(`ItemID`, 6, '0'))
-WHERE `SKU` IS NULL;
-
-ALTER TABLE `Item_R1`
-  MODIFY `SKU` varchar(64) NOT NULL,
+  ADD COLUMN `SKU` varchar(64)
+      GENERATED ALWAYS AS (CONCAT('KM-', LPAD(`ItemID`, 6, '0'))) STORED
+      NOT NULL
+      AFTER `ItemID`,
   ADD UNIQUE KEY `uq_item_r1_sku` (`SKU`),
   ADD CONSTRAINT `chk_item_r1_quantity_nonnegative` CHECK (`Quantity` >= 0),
   ADD CONSTRAINT `chk_item_r1_price_nonnegative`   CHECK (`Price`    >= 0);
