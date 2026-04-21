@@ -18,3 +18,8 @@ Database Systems class project for Kings Market: a pre-order and pickup workflow
 
 - Files in `migrations/` are kept as **documentation only** for the SQL optimization sprint.
 - Do not execute those files directly unless the team explicitly changes workflow.
+
+
+## to run cloud proxy
+download cloud proxy to somewhere
+run it with this: `.\cloud-sql-proxy.exe kings-market-491600:us-east4:kings-market-db --port 3306`
