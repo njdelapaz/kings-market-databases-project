@@ -23,3 +23,21 @@ export async function GET(request){
         return NextResponse.json({error: err}, {status: 500});
     }
 }
+
+export async function POST(request){
+    const {itemID, delta} = await request.json();
+    try{
+        const [res] = await db.query(
+            `UPDATE Item_R1 SET Quantity = Quantity + ? WHERE ItemID = ?`,
+            [delta, itemID]
+        )
+        return NextResponse.json({ 
+            success: true, 
+            message: 'Item updated successfully!',
+        });
+    }
+    catch(err){
+        console.log("Error: ", err);
+        return NextResponse.json({error: err}, {status: 500});
+    }
+}

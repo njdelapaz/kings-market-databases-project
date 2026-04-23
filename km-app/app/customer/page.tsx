@@ -13,6 +13,24 @@ export default function Dashboard() {
     const router = useRouter();
     const [alert, setAlert] = useState({show: false, itemName: ''});
 
+    async function updateItem(Item, delta){
+        try{
+            const res = await fetch('api/items',{
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({'itemID': Item.ItemID, 'delta': delta})
+            });
+
+            const data = await res.json();
+            if(data.success){
+                console.log("Item updated successfully!");
+                return;
+            }
+        } catch (error) {
+            console.error("Failed to fetch items:", error);
+        }
+    }
+
     async function getItems() {
         try {
             const res = await fetch('/api/items', {
@@ -48,7 +66,15 @@ export default function Dashboard() {
 
             const data = await res.json();
             if (data.success){
-                item.Quantity -= 1; // needs to be fixed!!
+                updateItem(item, 1);
+                // updating local state immediately.
+                setItems(prevItems => 
+                    prevItems.map(prevItem => 
+                        prevItem.ItemID === item.ItemID 
+                            ? { ...prevItem, Quantity: prevItem.Quantity - 1 } 
+                            : prevItem
+                    )
+                );
                 setAlert({show: true, itemName: item.Name});
                 setTimeout(() => {
                     setAlert({ show: false, itemName: '' });

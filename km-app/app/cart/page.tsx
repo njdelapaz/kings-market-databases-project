@@ -1,40 +1,79 @@
 'use client'
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useRouter } from 'next/navigation';
+import dayjs from 'dayjs';
 
 export default function Cart(){
-    const [cart, setCart] = useState([]);
+    const [cart, setCart] = useState({}); // hashmap for O(1) lookups by item id.
     const params = useSearchParams();
     const router = useRouter();
+    const [paymentInfo, setPaymentInfo] = useState(null);
+    const [paymentLoading, setPaymentLoading] = useState(true);
 
     useEffect(() => {
+        async function fetchPaymentInfo(){
+            try{
+                const res = await fetch (`api/paymentInfo/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({'customerEmail': params.get('email')})
+                });
+                const data = await res.json();
+                if(data.success){
+                    console.log(data);
+                    setPaymentInfo(data.paymentInfo);
+                    setPaymentLoading(false);
+                }
+                else{
+                    console.log(data);
+                }
+
+            } catch(err){
+                console.log(err);
+            }
+        }
+
         async function fetchCart() {
             const res = await fetch(`/api/cart/?email=${params.get('email')}`);
             const data = await res.json();
             if (data.success) {
-                setCart(data.cart);
+                // Convert Array [{ItemID: 1, ...}] to Object { 1: {...} }
+                const cartMap = data.cart.reduce((acc, item) => {
+                    acc[item.ItemID] = item;
+                    return acc;
+                }, {});
+                setCart(cartMap);
             }
         }
         if (params.get('email')) fetchCart();
+        if (params.get('email')) fetchPaymentInfo();
     }, [params.get('email')]);
 
-    const totalCost = 0;
-    if(cart){
-        const totalCost = cart.reduce((acc, item) => acc + (item.Price * item.TotalQuantity), 0)
+
+    // function to update item quantity.
+    async function add(){
+
     }
-    else{
-        const totalCost = 0;
+
+    async function remove(){
+
     }
+
+    const totalCost = Object.values(cart || []).reduce((acc, item) => {
+        return acc + (item.Price * item.TotalQuantity);
+    }, 0);
+    const isPaymentReady = !!paymentInfo;
+    const payment = paymentInfo?.[0];
+    console.log(paymentInfo);
+    
     return (
         <div className="min-h-screen bg-indigo-600 p-4 md:p-12">
             <div className="max-w-6xl mx-auto">
-                
+    
                 {/* Navigation Row */}
-                <button 
-                    onClick={() => {
-                        router.back();
-                    }}
+                <button
+                    onClick={() => router.back()}
                     className="flex items-center gap-2 text-indigo-100 hover:text-white mb-8 transition-colors font-medium"
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5">
@@ -42,47 +81,114 @@ export default function Cart(){
                     </svg>
                     Back to Dashboard
                 </button>
-
+    
                 <h1 className="text-4xl font-extrabold text-white mb-8 tracking-tight">Your Cart</h1>
-
-                {/* Main Content Split Layout */}
+    
                 <div className="flex flex-col lg:flex-row gap-8 items-start">
-                    
-                    {/* Left Side: Cart Items */}
-                    <div className="w-full lg:w-2/3 bg-white/95 backdrop-blur-sm rounded-3xl shadow-2xl overflow-hidden border border-indigo-400/20">
-                        <div className="divide-y divide-slate-100">
-                            {cart?.map((item) => (
-                                <div key={item.ItemID} className="p-6 flex justify-between items-center hover:bg-slate-50 transition-colors">
-                                    <div>
-                                        <h2 className="text-xl font-bold text-slate-900">{item.Name}</h2>
-                                        <p className="text-slate-500 font-medium">
-                                            ${Number(item.Price).toFixed(2)} <span className="text-slate-300 mx-2">|</span> Qty: {item.TotalQuantity}
+    
+                    {/* Left Side: Cart Items + Payment */}
+                    <div className="w-full lg:w-2/3 flex flex-col gap-6">
+    
+                        {/* Cart Items */}
+                        <div className="bg-white/95 backdrop-blur-sm rounded-3xl shadow-2xl overflow-hidden border border-indigo-400/20">
+                            <div className="divide-y divide-slate-100">
+                                {Object.values(cart)?.map((item) => (
+                                    <div key={item.ItemID} className="p-6 flex justify-between items-center hover:bg-slate-50 transition-colors">
+                                        <div>
+                                            <h2 className="text-xl font-bold text-slate-900">{item.Name}</h2>
+                                            <p className="text-slate-500 font-medium">
+                                                ${Number(item.Price).toFixed(2)} <span className="text-slate-300 mx-2">|</span> Qty: {item.TotalQuantity}
+                                            </p>
+                                        </div>
+                                        <p className="text-xl font-black text-indigo-600">
+                                            ${(item.Price * item.TotalQuantity).toFixed(2)}
                                         </p>
                                     </div>
-                                    <p className="text-xl font-black text-indigo-600">
-                                        ${(item.Price * item.TotalQuantity).toFixed(2)}
-                                    </p>
-                                </div>
-                            ))}
-
-                            {cart?.length === 0 && (
-                                <div className="p-20 text-center">
-                                    <div className="bg-slate-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8 text-slate-400">
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25 5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" />
-                                        </svg>
+                                ))}
+    
+                                {Object.values(cart)?.length === 0 && (
+                                    <div className="p-20 text-center">
+                                        <div className="bg-slate-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8 text-slate-400">
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25 5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" />
+                                            </svg>
+                                        </div>
+                                        <p className="text-slate-500 font-medium text-lg">Your cart is currently empty.</p>
                                     </div>
-                                    <p className="text-slate-500 font-medium text-lg">Your cart is currently empty.</p>
+                                )}
+                            </div>
+                        </div>
+    
+                        {/* Payment Information */}
+                        <div className="bg-white/95 backdrop-blur-sm rounded-3xl shadow-2xl p-8 border border-indigo-400/20">
+                            <div className="flex items-center gap-3 mb-6">
+                                <div className="bg-indigo-50 rounded-xl p-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 text-indigo-600">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z" />
+                                    </svg>
+                                </div>
+                                <h2 className="text-xl font-bold text-slate-900">Payment Information</h2>
+                                {paymentInfo && (
+                                    <span className="ml-auto text-xs bg-green-50 text-green-700 font-semibold px-3 py-1 rounded-full">
+                                        Saved
+                                    </span>
+                                )}
+                            </div>
+    
+                            {paymentLoading ? (
+                                <div className="flex items-center gap-3 text-slate-400 py-4">
+                                    <svg className="animate-spin w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                                    </svg>
+                                    <span className="font-medium">Loading your payment details…</span>
+                                </div>
+                            ) : paymentInfo ? (
+                                <div className="grid grid-cols-2 gap-4">
+                                    {[
+                                        { label: "First Name", value: payment?.First_Name},
+                                        { label: "Last Name", value: payment?.Last_Name },
+                                        { label: "Card Type", value: payment?.Type },
+                                        { label: "Provider", value: payment?.Provider },
+                                        { label: "Card Number", value: `•••• •••• •••• ${payment?.Number?.slice(-4)}`, full: true },
+                                        { label: "Expiration", value: dayjs(payment?.Exp_Date).format('MM/YY')},
+                                        { label: "Zip Code", value: payment?.Zip },
+                                    ].map(({ label, value, full }) => (
+                                        <div key={label} className={full ? "col-span-2" : ""}>
+                                            <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-1">{label}</p>
+                                            <p className="bg-slate-50 rounded-xl px-4 py-2.5 text-slate-800 font-medium text-sm border border-slate-100 tracking-wide">
+                                                {value}
+                                            </p>
+                                        </div>
+                                    ))}
+                                    <div className="col-span-2 pt-2">
+                                        <button
+                                            onClick={() => router.push("/account/payment")}
+                                            className="text-indigo-600 text-sm font-semibold hover:text-indigo-800 transition-colors"
+                                        >
+                                            Edit payment info →
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="text-center py-6">
+                                    <p className="text-slate-500 mb-4">No payment method saved.</p>
+                                    <button
+                                        onClick={() => router.push("/account/payment")}
+                                        className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-semibold text-sm hover:bg-indigo-700 transition-colors"
+                                    >
+                                        Add Payment Method
+                                    </button>
                                 </div>
                             )}
                         </div>
                     </div>
-
+    
                     {/* Right Side: Order Summary */}
                     <div className="w-full lg:w-1/3 sticky top-8">
                         <div className="bg-white rounded-3xl shadow-2xl p-8 border border-white">
                             <h2 className="text-2xl font-bold text-slate-900 mb-6">Order Summary</h2>
-                            
+    
                             <div className="space-y-4 mb-8">
                                 <div className="flex justify-between text-slate-600 font-medium">
                                     <span>Subtotal</span>
@@ -99,17 +205,20 @@ export default function Cart(){
                                     </span>
                                 </div>
                             </div>
-
-                            <button 
-                                disabled={cart?.length === 0}
+    
+                            <button
+                                disabled={Object.values(cart)?.length === 0 || !isPaymentReady}
                                 className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-indigo-700 active:scale-[0.98] transition-all shadow-lg shadow-indigo-200 disabled:bg-slate-200 disabled:shadow-none disabled:cursor-not-allowed"
                             >
                                 Proceed to Checkout
                             </button>
-                            
+    
+                            {!isPaymentReady && Object.values(cart)?.length > 0 && !paymentLoading && (
+                                <p className="text-center text-xs text-slate-400 mt-3">Add a payment method to continue</p>
+                            )}
                         </div>
                     </div>
-
+    
                 </div>
             </div>
         </div>
