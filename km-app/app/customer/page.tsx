@@ -1,8 +1,7 @@
-/* eslint-disable react-hooks/rules-of-hooks */
 'use client'
 
 import { useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import dayjs from 'dayjs';
 
@@ -14,7 +13,7 @@ type Item = {
     IsSelling: number | boolean;
 };
 
-export default function Dashboard() {
+function DashboardInner() {
     const [items, setItems] = useState<Item[]>([]);
     const [visibleCount, setVisibleCount] = useState(12); // How many items to show initially
     const params = useSearchParams();
@@ -238,5 +237,13 @@ export default function Dashboard() {
                 )}
             </div>
         </div>
+    );
+}
+
+export default function Dashboard() {
+    return (
+        <Suspense>
+            <DashboardInner />
+        </Suspense>
     );
 }
