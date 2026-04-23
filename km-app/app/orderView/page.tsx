@@ -1,39 +1,45 @@
 'use client'
-// page to help customers view their orders.
-import { useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import dayjs from 'dayjs';
 
+type OrderItem = {
+    ItemID: number;
+    Name: string;
+    Quantity: number;
+    Price: number;
+};
 
+type Order = {
+    OrderID: number;
+    Timestamp: string;
+    Items: OrderItem[];
+};
 
 export default function Orders(){
-    const params = useSearchParams();
     const router = useRouter();
-    const [orders, setOrders] = useState({});
-    const [openOrd, setOpenOrd] = useState(null);
+    const [orders, setOrders] = useState<Order[]>([]);
+    const [openOrd, setOpenOrd] = useState<number | null>(null);
+
     useEffect(() => {
         async function fetchOrders(){
             try{
-                const res = await fetch(`/api/orders/?email=${params.get('email')}`);
+                const res = await fetch('/api/orders');
                 const data = await res.json();
                 if(data.success){
                     setOrders(data.orders);
                 }
             } catch(error){
-                console.log(error)
+                console.error(error);
             }
         }
-        if (params.get('email')) fetchOrders();
-    }, [params.get('email')])
-
-
-
+        fetchOrders();
+    }, []);
 
     return (
         <div className="min-h-screen bg-indigo-600 p-4 md:p-12">
             <div className="max-w-6xl mx-auto">
-    
+
                 {/* Navigation Row */}
                 <button
                     onClick={() => router.back()}
@@ -44,13 +50,13 @@ export default function Orders(){
                     </svg>
                     Back to Dashboard
                 </button>
-    
+
                 <h1 className="text-4xl font-extrabold text-white mb-8 tracking-tight">Your Orders</h1>
-    
+
                 <div className="flex flex-col gap-4">
-                    {Object.values(orders)?.map(ord => (
+                    {orders.map((ord) => (
                         <div key={ord.OrderID} className="bg-white/95 backdrop-blur-sm rounded-3xl shadow-2xl overflow-hidden border border-indigo-400/20">
-    
+
                             {/* Order Header */}
                             <button
                                 onClick={() => setOpenOrd(openOrd === ord.OrderID ? null : ord.OrderID)}
@@ -76,11 +82,11 @@ export default function Orders(){
                                     </svg>
                                 </div>
                             </button>
-    
+
                             {/* Dropdown Items */}
                             {openOrd === ord.OrderID && (
                                 <div className="border-t border-slate-100 divide-y divide-slate-100">
-                                    {ord.Items.map(item => (
+                                    {ord.Items.map((item) => (
                                         <div key={item.ItemID} className="px-6 py-4 flex justify-between items-center hover:bg-slate-50 transition-colors">
                                             <div>
                                                 <p className="font-semibold text-slate-900">{item.Name}</p>
@@ -92,15 +98,15 @@ export default function Orders(){
                                     <div className="px-6 py-4 flex justify-between items-center bg-slate-50">
                                         <p className="text-sm text-slate-500 font-medium">Order Total</p>
                                         <p className="text-xl font-black text-indigo-600">
-                                            ${ord.Items.reduce((acc, item) => acc + item.Price * item.Quantity, 0).toFixed(2)}
+                                            ${ord.Items.reduce((acc: number, item: OrderItem) => acc + item.Price * item.Quantity, 0).toFixed(2)}
                                         </p>
                                     </div>
                                 </div>
                             )}
                         </div>
                     ))}
-    
-                    {Object.values(orders)?.length === 0 && (
+
+                    {orders.length === 0 && (
                         <div className="bg-white/95 rounded-3xl shadow-2xl p-20 text-center border border-indigo-400/20">
                             <div className="bg-slate-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8 text-slate-400">
