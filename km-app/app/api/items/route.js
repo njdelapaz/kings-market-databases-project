@@ -1,8 +1,7 @@
-import {NextResponse} from 'next/server'
+import { NextResponse } from 'next/server'
 import db from '@/lib/db'
 
 export async function GET(request){
-    // function to get all the items in the DB and display them.
     try{
         const [rows] = await db.query(
             `SELECT ItemID, Name, Quantity, Price, IsSelling
@@ -10,28 +9,37 @@ export async function GET(request){
             WHERE Quantity > 0
             AND IsSelling = 1`,
         );
-        return NextResponse.json({ success: true, items: rows});
+        return NextResponse.json({ success: true, items: rows });
     }
     catch (err){
-        console.log("Error: ", err);
-        return NextResponse.json({error: err}, {status: 500});
+        console.error('Items GET error:', err);
+        return NextResponse.json({ error: 'Internal server error.' }, { status: 500 });
     }
 }
 
 export async function POST(request){
-    const {itemID, delta} = await request.json();
+    // Only storekeepers may modify inventory
+    const role = request.headers.get('x-user-role');
+    if (role !== 'storekeeper') {
+        return NextResponse.json({ error: 'Forbidden.' }, { status: 403 });
+    }
+
+    const body = await request.json();
+    const { itemID, delta } = body;
+
+    if (itemID == null || delta == null) {
+        return NextResponse.json({ error: 'itemID and delta are required.' }, { status: 400 });
+    }
+
     try{
-        const [res] = await db.query(
+        await db.query(
             `UPDATE Item_R1 SET Quantity = Quantity + ? WHERE ItemID = ?`,
             [delta, itemID]
-        )
-        return NextResponse.json({ 
-            success: true, 
-            message: 'Item updated successfully!',
-        });
+        );
+        return NextResponse.json({ success: true, message: 'Item updated successfully.' });
     }
     catch(err){
-        console.log("Error: ", err);
-        return NextResponse.json({error: err}, {status: 500});
+        console.error('Items POST error:', err);
+        return NextResponse.json({ error: 'Internal server error.' }, { status: 500 });
     }
 }
