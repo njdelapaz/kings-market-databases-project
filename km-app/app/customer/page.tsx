@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import dayjs from 'dayjs';
 
 type Item = {
+    ItemID: number;
     Name: string;
     Quantity: number;
     Price: number | string;
@@ -20,7 +21,7 @@ export default function Dashboard() {
     const router = useRouter();
     const [alert, setAlert] = useState({show: false, itemName: ''});
 
-    async function updateItem(Item, delta){
+    async function updateItem(Item: Item, delta: number){
         try{
             const res = await fetch('api/items',{
                 method: 'POST',
@@ -55,7 +56,7 @@ export default function Dashboard() {
         }
     }
 
-    async function handleCart(item) {
+    async function handleCart(item: Item) {
         console.log("Item being added:", item);
         try{
             const info = {
@@ -102,8 +103,9 @@ export default function Dashboard() {
         setVisibleCount(prev => prev + 12); // when we click to show more items, add 12 more to show each time.
     };
 
-    const logout = () => {
-        router.push('/login')
+    const logout = async () => {
+        await fetch('/api/auth/logout', { method: 'POST' });
+        router.push('/login');
     }
 
     const viewCart = () => {

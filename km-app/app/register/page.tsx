@@ -4,35 +4,40 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
-export default function LoginPage() {
+export default function RegisterPage() {
   const router = useRouter();
 
-  const [role, setRole]         = useState('customer');
   const [username, setUsername] = useState('');
   const [email, setEmail]       = useState('');
+  const [phone, setPhone]       = useState('');
   const [password, setPassword] = useState('');
+  const [confirm, setConfirm]   = useState('');
   const [error, setError]       = useState('');
   const [loading, setLoading]   = useState(false);
 
   async function handleSubmit(e: { preventDefault(): void }) {
     e.preventDefault();
     setError('');
-    setLoading(true);
 
+    if (password !== confirm) {
+      setError('Passwords do not match.');
+      return;
+    }
+
+    setLoading(true);
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role, username, email, password }),
+        body: JSON.stringify({ username, email, phone, password }),
       });
 
       const data = await res.json();
 
       if (data.success) {
-        // Cookie is set by the server — redirect with name/email so existing pages can read them
-        router.push(`/${role}?name=${encodeURIComponent(username)}&email=${encodeURIComponent(email)}`);
+        router.push(`/customer?name=${encodeURIComponent(username)}&email=${encodeURIComponent(email)}`);
       } else {
-        setError(data.message || data.error || 'Login failed.');
+        setError(data.message || data.error || 'Registration failed.');
       }
     } catch {
       setError('Network error. Please try again.');
@@ -45,41 +50,15 @@ export default function LoginPage() {
     <div className="min-h-screen bg-indigo-600 flex flex-col justify-center py-10 px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <h1 className="text-center text-3xl font-extrabold text-white tracking-tight">
-          Welcome Back to Kings Market!
+          Create Your Account
         </h1>
         <p className="mt-2 text-center text-sm text-stone-100">
-          Please sign in to your account
+          Join Kings Market as a customer
         </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-6 shadow-xl rounded-xl border border-slate-200">
-
-          {/* Role selection tabs */}
-          <div className="flex p-1 bg-slate-100 rounded-lg mb-8">
-            <button
-              type="button"
-              onClick={() => setRole('customer')}
-              className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${
-                role === 'customer'
-                  ? 'bg-white text-indigo-600 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              Customer
-            </button>
-            <button
-              type="button"
-              onClick={() => setRole('storekeeper')}
-              className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${
-                role === 'storekeeper'
-                  ? 'bg-white text-indigo-600 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              Storekeeper
-            </button>
-          </div>
 
           {error && (
             <div className="mb-4 p-3 rounded-md bg-red-50 border border-red-200 text-sm text-red-600">
@@ -95,7 +74,7 @@ export default function LoginPage() {
               <input
                 type="text"
                 required
-                placeholder="Enter your username"
+                placeholder="Choose a username"
                 value={username}
                 onChange={e => setUsername(e.target.value)}
                 className="block w-full px-4 py-3 rounded-lg border border-slate-300 bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm"
@@ -109,9 +88,23 @@ export default function LoginPage() {
               <input
                 type="email"
                 required
-                placeholder="name@company.com"
+                placeholder="name@example.com"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
+                className="block w-full px-4 py-3 rounded-lg border border-slate-300 bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Phone Number
+              </label>
+              <input
+                type="tel"
+                required
+                placeholder="e.g. 555-123-4567"
+                value={phone}
+                onChange={e => setPhone(e.target.value)}
                 className="block w-full px-4 py-3 rounded-lg border border-slate-300 bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm"
               />
             </div>
@@ -123,9 +116,24 @@ export default function LoginPage() {
               <input
                 type="password"
                 required
-                placeholder="Enter your password"
+                minLength={8}
+                placeholder="At least 8 characters"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
+                className="block w-full px-4 py-3 rounded-lg border border-slate-300 bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Confirm Password
+              </label>
+              <input
+                type="password"
+                required
+                placeholder="Re-enter your password"
+                value={confirm}
+                onChange={e => setConfirm(e.target.value)}
                 className="block w-full px-4 py-3 rounded-lg border border-slate-300 bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm"
               />
             </div>
@@ -136,19 +144,17 @@ export default function LoginPage() {
                 disabled={loading}
                 className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {loading ? 'Signing in…' : `Sign In as ${role.charAt(0).toUpperCase() + role.slice(1)}`}
+                {loading ? 'Creating account…' : 'Create Account'}
               </button>
             </div>
           </form>
 
-          {role === 'customer' && (
-            <p className="mt-6 text-center text-sm text-slate-500">
-              Don&apos;t have an account?{' '}
-              <Link href="/register" className="text-indigo-600 font-medium hover:underline">
-                Create one
-              </Link>
-            </p>
-          )}
+          <p className="mt-6 text-center text-sm text-slate-500">
+            Already have an account?{' '}
+            <Link href="/login" className="text-indigo-600 font-medium hover:underline">
+              Sign in
+            </Link>
+          </p>
         </div>
       </div>
     </div>

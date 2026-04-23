@@ -1,9 +1,14 @@
 import { NextResponse } from 'next/server';
 import db from '@/lib/db';
 import bcrypt from 'bcryptjs';
+import { signToken, COOKIE_NAME } from '@/lib/auth';
 
 export async function POST(request) {
   const { role, username, email, password } = await request.json();
+
+  if (!role || !username || !email || !password) {
+    return NextResponse.json({ message: 'All fields are required.' }, { status: 400 });
+  }
 
   try {
     let rows;
@@ -35,24 +40,32 @@ export async function POST(request) {
 
     const user = rows[0];
 
-    // If the account has a password hash, verify the supplied password.
-    // Accounts seeded before migration 004 have an empty hash; they still work
-    // with username+email only until a password is explicitly set.
-    if (user.PasswordHash) {
-      if (!password) {
-        return NextResponse.json(
-          { message: 'Password required for this account.' },
-          { status: 401 }
-        );
-      }
-      const valid = await bcrypt.compare(password, user.PasswordHash);
-      if (!valid) {
-        return NextResponse.json({ message: 'Incorrect password.' }, { status: 401 });
-      }
+    if (!user.PasswordHash) {
+      return NextResponse.json(
+        { message: 'Account has no password set. Contact an admin.' },
+        { status: 401 }
+      );
     }
 
+    const valid = await bcrypt.compare(password, user.PasswordHash);
+    if (!valid) {
+      return NextResponse.json({ message: 'Incorrect password.' }, { status: 401 });
+    }
+
+    const token = await signToken({ sub: email, username, role });
+
     const { PasswordHash: _omit, ...safeUser } = user;
-    return NextResponse.json({ success: true, role, user: safeUser });
+    const response = NextResponse.json({ success: true, role, user: safeUser });
+
+    response.cookies.set(COOKIE_NAME, token, {
+      httpOnly: true,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+      secure: process.env.NODE_ENV === 'production',
+    });
+
+    return response;
   } catch (err) {
     console.error('Login error:', err);
     return NextResponse.json({ error: 'Internal server error.' }, { status: 500 });

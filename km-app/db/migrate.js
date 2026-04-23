@@ -28,6 +28,7 @@ async function run() {
     password:           process.env.DB_MIGRATE_PASSWORD || process.env.DB_PASSWORD,
     database:           process.env.DB_NAME,
     multipleStatements: true,
+    ssl:                { rejectUnauthorized: false },
   });
 
   try {
