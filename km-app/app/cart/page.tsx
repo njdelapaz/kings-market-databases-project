@@ -21,7 +21,6 @@ export default function Cart(){
                 });
                 const data = await res.json();
                 if(data.success){
-                    console.log(data);
                     setPaymentInfo(data.paymentInfo);
                     setPaymentLoading(false);
                 }
@@ -39,7 +38,8 @@ export default function Cart(){
             const data = await res.json();
             if (data.success) {
                 // Convert Array [{ItemID: 1, ...}] to Object { 1: {...} }
-                const cartMap = data.cart.reduce((acc, item) => {
+                //when we fetch the cart, it is an array, which is why we can use reduce on it.
+                const cartMap = (data.cart ?? []).reduce((acc, item) => {
                     acc[item.ItemID] = item;
                     return acc;
                 }, {});
@@ -60,12 +60,30 @@ export default function Cart(){
 
     }
 
+    async function checkout(){
+        try{
+            const res = await fetch(`api/checkout`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({'customerEmail': params.get('email'), 'cart': cart})
+            })
+
+            const data = await res.json();
+            if(data.success){
+                console.log("success! Order processed.");
+                setCart({});
+                router.back(); // needs to be more sophisticated, will be after login changes are implemented.
+            }
+        } catch(err){
+            console.log(err);
+        }
+    }
+
     const totalCost = Object.values(cart || []).reduce((acc, item) => {
         return acc + (item.Price * item.TotalQuantity);
-    }, 0);
+    }, 0); // we take all the items in our cart, and return the total cost of items in the cart.
     const isPaymentReady = !!paymentInfo;
     const payment = paymentInfo?.[0];
-    console.log(paymentInfo);
     
     return (
         <div className="min-h-screen bg-indigo-600 p-4 md:p-12">
@@ -146,6 +164,9 @@ export default function Cart(){
                             ) : paymentInfo ? (
                                 <div className="grid grid-cols-2 gap-4">
                                     {[
+                                        // paymentInfo from above is an array, with one element.
+                                        // so to make things simpler, we just get that first element earlier.
+                                        // that element's basically a hashmap (payment object), which has these attributes we can reference.
                                         { label: "First Name", value: payment?.First_Name},
                                         { label: "Last Name", value: payment?.Last_Name },
                                         { label: "Card Type", value: payment?.Type },
@@ -207,8 +228,11 @@ export default function Cart(){
                             </div>
     
                             <button
+                                // making sure that the button is disabled if there's nothing in the cart
+                                // or if the payment info hasn't been properly added/saved.
                                 disabled={Object.values(cart)?.length === 0 || !isPaymentReady}
                                 className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold text-lg hover:bg-indigo-700 active:scale-[0.98] transition-all shadow-lg shadow-indigo-200 disabled:bg-slate-200 disabled:shadow-none disabled:cursor-not-allowed"
+                                onClick={() => checkout()}
                             >
                                 Proceed to Checkout
                             </button>

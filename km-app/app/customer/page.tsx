@@ -66,7 +66,7 @@ export default function Dashboard() {
 
             const data = await res.json();
             if (data.success){
-                updateItem(item, 1);
+                updateItem(item, -1);
                 // updating local state immediately.
                 setItems(prevItems => 
                     prevItems.map(prevItem => 
@@ -100,7 +100,11 @@ export default function Dashboard() {
     }
 
     const viewCart = () => {
-        router.push(`/cart?email=${params.get('email')}`)
+        router.push(`/cart?email=${params.get('email')}`);
+    }
+    
+    const viewPastOrders = () => {
+        router.push(`/orderView?email=${params.get('email')}`);
     }
 
     return (
@@ -138,6 +142,12 @@ export default function Dashboard() {
                             onClick={() => viewCart()}
                             >
                             Cart
+                        </button>
+                        <button 
+                            className='mt-2 p-3 font-semibold text-indigo-600 hover:text-black hover:bg-slate-50 rounded-2xl cursor-pointer'
+                            onClick={() => viewPastOrders()}
+                            >
+                            Past Orders
                         </button>
                         <h1 className='mt-2 p-3 font-semibold text-indigo-600 hover:text-black hover:bg-slate-50 rounded-2xl cursor-pointer'>
                             Item Requests

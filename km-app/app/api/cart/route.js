@@ -8,7 +8,7 @@ export async function GET(request){
     const CustomerEmail = searchParams.get('email');
     try{
         const [rows] = await db.query(
-            `SELECT 
+                `SELECT 
                 i.Name, 
                 i.Price, 
                 uc.ItemID,
@@ -20,10 +20,14 @@ export async function GET(request){
             FROM UpdateCart uc
             JOIN Item_R1 i ON uc.ItemID = i.ItemID
             WHERE uc.CustomerEmail = ?
-            GROUP BY uc.ItemID
-            HAVING TotalQuantity > 0
-            `, 
-            [CustomerEmail]
+            AND uc.Timestamp > COALESCE(
+                (SELECT MAX(uc2.Timestamp) FROM UpdateCart uc2
+                WHERE uc2.CustomerEmail = ? AND uc2.Action = 'Clear'),
+                '1970-01-01'
+            )
+            GROUP BY uc.ItemID, i.Name, i.Price
+            HAVING TotalQuantity > 0`, 
+            [CustomerEmail, CustomerEmail]
         )
         if(rows.length > 0){
             return NextResponse.json({success: true, cart: rows})

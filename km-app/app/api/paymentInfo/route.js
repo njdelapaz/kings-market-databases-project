@@ -7,7 +7,6 @@ export async function POST(request){
         const [rows] = await db.query(
             `SELECT * FROM PaymentInfo WHERE CustomerEmail = ?`, [customerEmail]
         );
-        console.log(rows);
         if(rows.length == 1){
             return NextResponse.json({ success: true, paymentInfo: rows});
         } else{

@@ -10,12 +10,6 @@ export async function GET(request){
             WHERE Quantity > 0
             AND IsSelling = 1`,
         );
-        if(rows.length > 0){
-            console.log("Output: ", rows.slice(0, 5));
-        }
-        else{
-            console.log("No Items!");
-        }
         return NextResponse.json({ success: true, items: rows});
     }
     catch (err){
