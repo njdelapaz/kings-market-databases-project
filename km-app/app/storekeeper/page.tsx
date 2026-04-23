@@ -182,6 +182,129 @@ function DashboardInner() {
         }
     };
 
+    const openEdit = (item: Item) => {
+        setEditingItemId(item.ItemID);
+        setEditItem({
+            name: item.Name,
+            category: item.Category || '',
+            quantity: String(item.Quantity),
+            price: String(item.Price),
+            isSelling: item.IsSelling === 1,
+        });
+    }
+
+    const closeEdit = () => {
+        setEditingItemId(null);
+    }
+
+    const onSearchSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        await getItems(search);
+    }
+
+    const handleCreateItem = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setStatusMsg('');
+        setErrorMsg('');
+        setIsSubmitting(true);
+        try {
+            const res = await fetch('/api/admin/items', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    sku: newItem.sku,
+                    name: newItem.name,
+                    category: newItem.category,
+                    quantity: Number(newItem.quantity),
+                    price: Number(newItem.price),
+                    isSelling: newItem.isSelling,
+                }),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                setErrorMsg(data.message || 'Failed to create item.');
+                return;
+            }
+
+            setStatusMsg('Item added successfully.');
+            setNewItem({
+                sku: '',
+                name: '',
+                category: '',
+                quantity: '0',
+                price: '0',
+                isSelling: true,
+            });
+            setShowAddForm(false);
+            await getItems();
+        } catch (error) {
+            console.error(error);
+            setErrorMsg('Failed to create item.');
+        } finally {
+            setIsSubmitting(false);
+        }
+    }
+
+    const handleSaveItem = async (itemId: number) => {
+        setStatusMsg('');
+        setErrorMsg('');
+        setIsSubmitting(true);
+        try {
+            const res = await fetch(`/api/admin/items/${itemId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: editItem.name,
+                    category: editItem.category,
+                    quantity: Number(editItem.quantity),
+                    price: Number(editItem.price),
+                    isSelling: editItem.isSelling,
+                }),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                setErrorMsg(data.message || 'Failed to update item.');
+                return;
+            }
+
+            setStatusMsg('Item updated successfully.');
+            setEditingItemId(null);
+            await getItems();
+        } catch (error) {
+            console.error(error);
+            setErrorMsg('Failed to update item.');
+        } finally {
+            setIsSubmitting(false);
+        }
+    }
+
+    const handleSoftDisable = async (itemId: number) => {
+        setStatusMsg('');
+        setErrorMsg('');
+        setIsSubmitting(true);
+        try {
+            const res = await fetch(`/api/admin/items/${itemId}`, {
+                method: 'DELETE',
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                setErrorMsg(data.message || 'Failed to remove item from sale.');
+                return;
+            }
+
+            setStatusMsg('Item removed from sale.');
+            if (editingItemId === itemId) {
+                setEditingItemId(null);
+            }
+            await getItems();
+        } catch (error) {
+            console.error(error);
+            setErrorMsg('Failed to remove item from sale.');
+        } finally {
+            setIsSubmitting(false);
+        }
+    }
+
     return (
         <div className="min-h-screen bg-indigo-600 p-4 md:p-8">
             <div className="max-w-6xl mx-auto">
@@ -296,13 +419,21 @@ function DashboardInner() {
                                             Available for sale
                                         </label>
                                         <div className="flex gap-2">
-                                            <button onClick={() => handleSaveItem(item.ItemID)} disabled={isSubmitting} className="text-xs font-semibold text-blue-600 hover:text-blue-700 disabled:opacity-60">Save</button>
-                                            <button onClick={closeEdit} className="text-xs font-semibold text-slate-600 hover:text-slate-900">Cancel</button>
-                                            <button onClick={() => handleSoftDisable(item.ItemID)} disabled={isSubmitting} className="text-xs font-semibold text-red-600 hover:text-red-700 disabled:opacity-60">Remove from Sale</button>
+                                            <button onClick={() => handleSaveItem(item.ItemID)} disabled={isSubmitting} className="text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors disabled:opacity-60">
+                                                Save
+                                            </button>
+                                            <button onClick={closeEdit} className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors">
+                                                Cancel
+                                            </button>
+                                            <button onClick={() => handleSoftDisable(item.ItemID)} disabled={isSubmitting} className="text-xs font-semibold text-red-600 hover:text-red-700 transition-colors disabled:opacity-60">
+                                                Remove from Sale
+                                            </button>
                                         </div>
                                     </div>
                                 ) : (
-                                    <button onClick={() => openEdit(item)} className="text-sm font-semibold text-blue-600 hover:text-blue-700 self-end">Update</button>
+                                    <button onClick={() => openEdit(item)} className="text-sm font-semibold text-blue-600 hover:text-blue-700 transition-colors self-end">
+                                        Update
+                                    </button>
                                 )}
                             </div>
                         </div>
