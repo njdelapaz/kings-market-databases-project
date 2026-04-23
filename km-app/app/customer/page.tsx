@@ -6,8 +6,15 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import dayjs from 'dayjs';
 
+type Item = {
+    Name: string;
+    Quantity: number;
+    Price: number | string;
+    IsSelling: number | boolean;
+};
+
 export default function Dashboard() {
-    const [items, setItems] = useState([]);
+    const [items, setItems] = useState<Item[]>([]);
     const [visibleCount, setVisibleCount] = useState(12); // How many items to show initially
     const params = useSearchParams();
     const router = useRouter();

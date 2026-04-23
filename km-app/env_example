@@ -1,0 +1,31 @@
+# ------------------------------------------------------------
+# Database — connection details
+# ------------------------------------------------------------
+
+DB_HOST=localhost
+DB_NAME=hgr9ba_b
+
+# ------------------------------------------------------------
+# App runtime user (km_app) — used by the Next.js server
+# Least-privileged: SELECT, INSERT, UPDATE only.
+# Set these after running db/setup_db_users.sql as root.
+# ------------------------------------------------------------
+
+DB_APP_USER=km_app
+DB_APP_PASSWORD=replace_with_km_app_password
+
+# ------------------------------------------------------------
+# Migration user (km_migrate) — used only by npm run migrate
+# Has full DDL privileges on the database.
+# ------------------------------------------------------------
+
+DB_MIGRATE_USER=km_migrate
+DB_MIGRATE_PASSWORD=replace_with_km_migrate_password
+
+# ------------------------------------------------------------
+# Fallback credentials (used if APP/MIGRATE vars are not set)
+# Can point to your local root/admin user during development.
+# ------------------------------------------------------------
+
+DB_USER=root
+DB_PASSWORD=replace_with_your_root_password

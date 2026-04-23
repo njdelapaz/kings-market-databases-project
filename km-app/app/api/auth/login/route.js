@@ -1,40 +1,60 @@
-import {NextResponse} from 'next/server'
-import db from '@/lib/db'
+import { NextResponse } from 'next/server';
+import db from '@/lib/db';
+import bcrypt from 'bcryptjs';
 
-export async function POST(request){
-    const {role, username, email} = await request.json(); //only using username, email for now.
-    try{
-        // check customers if role is customer.
-        if(role == 'customer'){
-            const [rows] = await db.query(
-                `SELECT c2.Username, c2.Email
-                FROM Customer_R2 c2
-                WHERE c2.username = ? AND c2.Email = ?`,
-                [username, email]
-            )
-            if(rows.length == 0){
-                console.log(`Error. No customer account with username ${username} and email ${email} found.`);
-                return NextResponse.json({message: "No account found with those details."});
-            }
-            console.log('Customer Query Result: ', rows);
-            return NextResponse.json({ success: true, role: 'customer', user: rows[0] });
-        }
-        else if (role == 'storekeeper'){
-            const [rows] = await db.query(
-                `SELECT s2.Username, s2.Email
-                FROM Storekeeper_R2 s2
-                WHERE s2.username = ? AND s2.Email = ?`, 
-                [username, email]
-            )
-            if(rows.length == 0){
-                console.log(`Error. No storekeeper account with username ${username} and email ${email} found.`);
-                return NextResponse.json({message: "No account found with those details."});
-            }
-            console.log('Storekeeper Query Result: ', rows);
-            return NextResponse.json({ success: true, role: 'storekeeper', user: rows[0] });
-        }
-    } catch(err) {
-        console.log("Error: ", err);
-        return NextResponse.json({error: err}, {status: 500})
+export async function POST(request) {
+  const { role, username, email, password } = await request.json();
+
+  try {
+    let rows;
+
+    if (role === 'customer') {
+      [rows] = await db.query(
+        `SELECT Username, Email, PasswordHash
+         FROM Customer_R2
+         WHERE Username = ? AND Email = ?`,
+        [username, email]
+      );
+    } else if (role === 'storekeeper') {
+      [rows] = await db.query(
+        `SELECT Username, Email, PasswordHash
+         FROM Storekeeper_R2
+         WHERE Username = ? AND Email = ?`,
+        [username, email]
+      );
+    } else {
+      return NextResponse.json({ message: 'Invalid role.' }, { status: 400 });
     }
+
+    if (rows.length === 0) {
+      return NextResponse.json(
+        { message: 'No account found with those details.' },
+        { status: 401 }
+      );
+    }
+
+    const user = rows[0];
+
+    // If the account has a password hash, verify the supplied password.
+    // Accounts seeded before migration 004 have an empty hash; they still work
+    // with username+email only until a password is explicitly set.
+    if (user.PasswordHash) {
+      if (!password) {
+        return NextResponse.json(
+          { message: 'Password required for this account.' },
+          { status: 401 }
+        );
+      }
+      const valid = await bcrypt.compare(password, user.PasswordHash);
+      if (!valid) {
+        return NextResponse.json({ message: 'Incorrect password.' }, { status: 401 });
+      }
+    }
+
+    const { PasswordHash: _omit, ...safeUser } = user;
+    return NextResponse.json({ success: true, role, user: safeUser });
+  } catch (err) {
+    console.error('Login error:', err);
+    return NextResponse.json({ error: 'Internal server error.' }, { status: 500 });
+  }
 }
