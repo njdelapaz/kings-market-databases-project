@@ -37,7 +37,7 @@ export default function LoginPage() {
         if (data.success) {
             console.log(`Logged In As ${role}!`);
             // redirect user to dashboard for items.
-            router.push(`/${role}?name=${username}`);
+            router.push(`/${role}?name=${username}&email=${email}`);
         } else {
             setError(data.error);
         }
