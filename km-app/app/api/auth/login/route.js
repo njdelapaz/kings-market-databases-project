@@ -54,6 +54,7 @@ export async function POST(request) {
 
     const token = await signToken({ sub: email, username, role });
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { PasswordHash: _omit, ...safeUser } = user;
     const response = NextResponse.json({ success: true, role, user: safeUser });
 

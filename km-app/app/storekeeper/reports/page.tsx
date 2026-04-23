@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 type ReportData = {
@@ -28,7 +28,7 @@ type ReportData = {
   };
 };
 
-export default function StorekeeperReportsPage() {
+function StorekeeperReportsInner() {
   const router = useRouter();
   const params = useSearchParams();
   const name = params.get('name') || 'Storekeeper';
@@ -182,5 +182,17 @@ export default function StorekeeperReportsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function StorekeeperReportsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-indigo-600 p-8 flex items-center justify-center">
+        <p className="text-white text-xl">Loading reports...</p>
+      </div>
+    }>
+      <StorekeeperReportsInner />
+    </Suspense>
   );
 }

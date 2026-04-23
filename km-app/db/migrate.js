@@ -1,5 +1,6 @@
 // db/migrate.js — run with: node db/migrate.js
 // Uses DB_MIGRATE_USER/DB_MIGRATE_PASSWORD if set, falls back to DB_USER/DB_PASSWORD.
+/* eslint-disable @typescript-eslint/no-require-imports */
 
 const mysql = require('mysql2/promise');
 const fs    = require('fs');
