@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 
 type Item = {
     ItemID: number;
@@ -13,9 +13,9 @@ type Item = {
     Category: string | null;
 }
 
-export default function Dashboard() {
+function DashboardInner() {
     const [items, setItems] = useState<Item[]>([]);
-    const [visibleCount, setVisibleCount] = useState(12); // How many items to show initially
+    const [visibleCount, setVisibleCount] = useState(12);
     const [search, setSearch] = useState('');
     const [showInactive, setShowInactive] = useState(true);
     const [showAddForm, setShowAddForm] = useState(false);
@@ -50,7 +50,6 @@ export default function Dashboard() {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' },
             });
-
             const data = await res.json();
             if (data.success) {
                 setItems(data.items);
@@ -69,13 +68,119 @@ export default function Dashboard() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [showInactive]);
 
-    const loadMore = () => {
-        setVisibleCount(prev => prev + 12); // when we click to show more items, add 12 more to show each time.
+    const loadMore = () => setVisibleCount(prev => prev + 12);
+
+    const logout = async () => {
+        await fetch('/api/auth/logout', { method: 'POST' });
+        router.push('/login');
     };
 
-    const logout = () => {
-        router.push('/login')
-    }
+    const openEdit = (item: Item) => {
+        setEditingItemId(item.ItemID);
+        setEditItem({
+            name: item.Name,
+            category: item.Category || '',
+            quantity: String(item.Quantity),
+            price: String(item.Price),
+            isSelling: item.IsSelling === 1,
+        });
+    };
+
+    const closeEdit = () => setEditingItemId(null);
+
+    const onSearchSubmit = async (e: { preventDefault(): void }) => {
+        e.preventDefault();
+        await getItems(search);
+    };
+
+    const handleCreateItem = async (e: { preventDefault(): void }) => {
+        e.preventDefault();
+        setStatusMsg('');
+        setErrorMsg('');
+        setIsSubmitting(true);
+        try {
+            const res = await fetch('/api/admin/items', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    sku: newItem.sku,
+                    name: newItem.name,
+                    category: newItem.category,
+                    quantity: Number(newItem.quantity),
+                    price: Number(newItem.price),
+                    isSelling: newItem.isSelling,
+                }),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                setErrorMsg(data.message || 'Failed to create item.');
+                return;
+            }
+            setStatusMsg('Item added successfully.');
+            setNewItem({ sku: '', name: '', category: '', quantity: '0', price: '0', isSelling: true });
+            setShowAddForm(false);
+            await getItems();
+        } catch (error) {
+            console.error(error);
+            setErrorMsg('Failed to create item.');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleSaveItem = async (itemId: number) => {
+        setStatusMsg('');
+        setErrorMsg('');
+        setIsSubmitting(true);
+        try {
+            const res = await fetch(`/api/admin/items/${itemId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: editItem.name,
+                    category: editItem.category,
+                    quantity: Number(editItem.quantity),
+                    price: Number(editItem.price),
+                    isSelling: editItem.isSelling,
+                }),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                setErrorMsg(data.message || 'Failed to update item.');
+                return;
+            }
+            setStatusMsg('Item updated successfully.');
+            setEditingItemId(null);
+            await getItems();
+        } catch (error) {
+            console.error(error);
+            setErrorMsg('Failed to update item.');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleSoftDisable = async (itemId: number) => {
+        setStatusMsg('');
+        setErrorMsg('');
+        setIsSubmitting(true);
+        try {
+            const res = await fetch(`/api/admin/items/${itemId}`, { method: 'DELETE' });
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                setErrorMsg(data.message || 'Failed to remove item from sale.');
+                return;
+            }
+            setStatusMsg('Item removed from sale.');
+            if (editingItemId === itemId) setEditingItemId(null);
+            await getItems();
+        } catch (error) {
+            console.error(error);
+            setErrorMsg('Failed to remove item from sale.');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
 
     const openEdit = (item: Item) => {
         setEditingItemId(item.ItemID);
@@ -206,9 +311,9 @@ export default function Dashboard() {
                 {/* Header Card */}
                 <div className="bg-white rounded-2xl shadow-sm p-8 border border-slate-200 mb-8 flex justify-between">
                     <h1 className="mt-2 p-3 text-slate-600">
-                        Hey <span className="font-semibold text-blue-600">{params.get('name')}</span>! 
+                        Hey <span className="font-semibold text-blue-600">{params.get('name')}</span>!
                     </h1>
-                    <div className = "flex justify-between gap-1">
+                    <div className="flex justify-between gap-1">
                         <button
                             onClick={() => setShowInactive(prev => !prev)}
                             className='mt-2 p-3 font-semibold text-blue-500 hover:bg-slate-50 hover:text-black rounded-2xl cursor-pointer'
@@ -221,7 +326,7 @@ export default function Dashboard() {
                         >
                             Add New Item
                         </button>
-                        <button 
+                        <button
                             onClick={logout}
                             className="mt-2 p-2 text-sm font-semibold border-transparent text-slate-600 rounded-lg hover:bg-slate-50 hover:text-red-600 hover:border-red-200 transition-all flex items-center gap-2"
                         >
@@ -240,20 +345,10 @@ export default function Dashboard() {
                         placeholder="Search by item name or SKU"
                         className="flex-grow px-4 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-300"
                     />
-                    <button
-                        type="submit"
-                        className="px-5 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition"
-                    >
+                    <button type="submit" className="px-5 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition">
                         Search
                     </button>
-                    <button
-                        type="button"
-                        onClick={() => {
-                            setSearch('');
-                            getItems('');
-                        }}
-                        className="px-5 py-2 bg-slate-100 text-slate-700 font-semibold rounded-lg hover:bg-slate-200 transition"
-                    >
+                    <button type="button" onClick={() => { setSearch(''); getItems(''); }} className="px-5 py-2 bg-slate-100 text-slate-700 font-semibold rounded-lg hover:bg-slate-200 transition">
                         Clear
                     </button>
                 </form>
@@ -292,40 +387,25 @@ export default function Dashboard() {
                 {/* Items Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                     {items.slice(0, visibleCount).map((item) => (
-                        <div 
-                            key={item.ItemID} 
-                            className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col"
-                        >
-                            {/* Card Header/Title */}
+                        <div key={item.ItemID} className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col">
                             <div className="p-5 flex-grow">
                                 <div className="flex justify-between items-start mb-2">
-                                    <h3 className="text-lg font-bold text-slate-900 leading-tight">
-                                        {item.Name}
-                                    </h3>
+                                    <h3 className="text-lg font-bold text-slate-900 leading-tight">{item.Name}</h3>
                                     {item.Quantity > 0 ? (
-                                        <span className="bg-green-100 text-green-700 text-[10px] uppercase tracking-wider font-bold px-2 py-1 rounded-full">
-                                            In Stock
-                                        </span>
+                                        <span className="bg-green-100 text-green-700 text-[10px] uppercase tracking-wider font-bold px-2 py-1 rounded-full">In Stock</span>
                                     ) : (
-                                        <span className="bg-slate-100 text-slate-500 text-[10px] uppercase tracking-wider font-bold px-2 py-1 rounded-full">
-                                            Unavailable
-                                        </span>
+                                        <span className="bg-slate-100 text-slate-500 text-[10px] uppercase tracking-wider font-bold px-2 py-1 rounded-full">Unavailable</span>
                                     )}
                                 </div>
-
                                 <p className="text-xs text-slate-500 mt-1">SKU: {item.SKU}</p>
                                 <p className="text-xs text-slate-500 mt-1">Category: {item.Category || 'N/A'}</p>
-                                <p className="text-2xl font-semibold text-blue-600 mt-2">
-                                    ${Number(item.Price).toFixed(2)}
-                                </p>
+                                <p className="text-2xl font-semibold text-blue-600 mt-2">${Number(item.Price).toFixed(2)}</p>
                             </div>
 
-                            {/* Card Footer */}
                             <div className="bg-slate-50 px-5 py-3 border-t border-slate-100 flex flex-col gap-3">
                                 <span className="text-sm text-slate-500 font-medium">
                                     Quantity: <span className="text-slate-900">{item.Quantity}</span>
                                 </span>
-
                                 {editingItemId === item.ItemID ? (
                                     <div className="w-full flex flex-col gap-2">
                                         <input value={editItem.name} onChange={(e) => setEditItem(prev => ({ ...prev, name: e.target.value }))} placeholder="Name" className="px-3 py-2 rounded-lg border border-slate-300 text-sm" />
@@ -360,13 +440,9 @@ export default function Dashboard() {
                     ))}
                 </div>
 
-                {/* Pagination / Load More */}
                 {visibleCount < items.length && (
                     <div className="mt-12 flex justify-center">
-                        <button 
-                            onClick={loadMore}
-                            className="px-8 py-3 bg-white border border-slate-300 text-slate-700 font-semibold rounded-full hover:bg-slate-50 hover:border-slate-400 transition-all shadow-sm"
-                        >
+                        <button onClick={loadMore} className="px-8 py-3 bg-white border border-slate-300 text-slate-700 font-semibold rounded-full hover:bg-slate-50 hover:border-slate-400 transition-all shadow-sm">
                             Show More Items
                         </button>
                     </div>
@@ -379,5 +455,13 @@ export default function Dashboard() {
                 )}
             </div>
         </div>
+    );
+}
+
+export default function Dashboard() {
+    return (
+        <Suspense>
+            <DashboardInner />
+        </Suspense>
     );
 }
