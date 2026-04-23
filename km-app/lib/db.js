@@ -5,7 +5,8 @@ const dbConfig = {
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
   // Hardcoding this temporarily to guarantee it uses the secure tunnel
-  socketPath: '/cloudsql/kings-market-491600:us-east4:kings-market-db'
+  socketPath: '/cloudsql/kings-market-491600:us-east4:kings-market-db',
+  enableCleartextPlugin: true
 };
 
 const db = mysql.createPool(dbConfig);
