@@ -1,3 +1,4 @@
 km-app/cloud-sql-proxy.exe
 km-app/.env.local
 km-app/cloud-sql-proxy
+.cursor
