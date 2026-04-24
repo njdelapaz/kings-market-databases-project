@@ -33,9 +33,10 @@ SET time_zone = "+00:00";
 
 
 CREATE TABLE `CustomerOrder` (
-  `OrderID` int(11) NOT NULL,
+  `OrderID` int(11) NOT NULL AUTO_INCREMENT,
   `CustomerEmail` varchar(255) NOT NULL,
-  `Timestamp` datetime NOT NULL DEFAULT current_timestamp()
+  `Timestamp` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`OrderID`,`CustomerEmail`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci; -- should be same collation for ALL tables in the db, otherwise issues with keys.
 
 --
@@ -1779,7 +1780,6 @@ INSERT INTO `AdminDataOperation` (`OperationID`, `StorekeeperEmail`, `OperationT
 -- Indexes for table `CustomerOrder`
 --
 ALTER TABLE `CustomerOrder`
-  ADD PRIMARY KEY (`OrderID`,`CustomerEmail`),
   ADD KEY `fk_customerorder_customer` (`CustomerEmail`);
 
 --

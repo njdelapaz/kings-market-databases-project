@@ -18,3 +18,19 @@ Database Systems class project for Kings Market: a pre-order and pickup workflow
 
 - Files in `migrations/` are kept as **documentation only** for the SQL optimization sprint.
 - Do not execute those files directly unless the team explicitly changes workflow.
+
+
+## to run cloud proxy
+first download gcloud and login with `gcloud auth application-default login`
+this logs you into your google account and should let you access the gcloud stuff from your computer
+
+then download cloud proxy to somewhere (anywhere really)
+run it with this:
+
+for windows: `.\cloud-sql-proxy.exe kings-market-491600:us-east4:kings-market-db --port 3306`
+
+for macOS: `./cloud-sql-proxy kings-market-491600:us-east4:kings-market-db --port 3306`
+
+for linux: `idk man good luck`
+
+this will have the proxy running in that terminal, which is good, and you should be able to access the database now
