@@ -49,7 +49,8 @@ jobs:
             --region $REGION \
             --platform managed \
             --allow-unauthenticated \
-            --set-env-vars "DB_NAME=${{ secrets.DB_NAME }},DB_USER=${{ secrets.DB_USER }}" \
+            --add-cloudsql-instances "${{ secrets.CLOUD_SQL_INSTANCE }}" \
+            --set-env-vars "DB_SOCKET_PATH=/cloudsql/${{ secrets.CLOUD_SQL_INSTANCE }},DB_NAME=${{ secrets.DB_NAME }},DB_USER=${{ secrets.DB_USER }}" \
             --set-secrets "DB_PASSWORD=km-db-password:latest,JWT_SECRET=km-jwt-secret:latest" \
             --min-instances 0 \
             --max-instances 3
