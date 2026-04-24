@@ -20,17 +20,31 @@ function loadEnvLocal() {
   }
 }
 
-async function run() {
-  loadEnvLocal();
-
-  const conn = await mysql.createConnection({
-    host:               process.env.DB_HOST,
+function buildConnConfig() {
+  const base = {
     user:               process.env.DB_MIGRATE_USER     || process.env.DB_USER,
     password:           process.env.DB_MIGRATE_PASSWORD || process.env.DB_PASSWORD,
     database:           process.env.DB_NAME,
     multipleStatements: true,
-    ssl:                { rejectUnauthorized: false },
-  });
+  };
+  // Cloud SQL via Unix socket (same contract as lib/db.js) — no SSL needed.
+  if (process.env.DB_SOCKET_PATH) {
+    return { ...base, socketPath: process.env.DB_SOCKET_PATH, enableCleartextPlugin: true };
+  }
+  const host = process.env.DB_HOST || '127.0.0.1';
+  const port = parseInt(process.env.DB_PORT || '3306', 10);
+  const isLocal = host === '127.0.0.1' || host === 'localhost';
+  // Only request TLS for remote hosts; local MySQL installs usually don't
+  // have SSL enabled and will error with "Server does not support secure connection".
+  return isLocal
+    ? { ...base, host, port }
+    : { ...base, host, port, ssl: { rejectUnauthorized: false } };
+}
+
+async function run() {
+  loadEnvLocal();
+
+  const conn = await mysql.createConnection(buildConnConfig());
 
   try {
     await conn.execute(`

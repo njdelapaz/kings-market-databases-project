@@ -16,4 +16,23 @@ if (process.env.DB_SOCKET_PATH) {
 
 const db = mysql.createPool(dbConfig);
 
+// Runs `fn` inside a single pooled connection wrapped in a transaction.
+// Commits on success, rolls back on throw, and always releases the connection.
+// The callback receives the raw connection so it can use row-level locks
+// (e.g. `SELECT ... FOR UPDATE`) that must share a transaction.
+export async function withTransaction(fn) {
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+    const result = await fn(conn);
+    await conn.commit();
+    return result;
+  } catch (err) {
+    try { await conn.rollback(); } catch { /* rollback attempt? */ }
+    throw err;
+  } finally {
+    conn.release();
+  }
+}
+
 export default db;
