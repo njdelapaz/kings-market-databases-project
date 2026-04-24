@@ -52,7 +52,6 @@ function ItemDetailInner() {
     const [item,      setItem]      = useState<Item | null>(null);
     const [loading,   setLoading]   = useState(true);
     const [errorMsg,  setErrorMsg]  = useState('');
-    const [qty,       setQty]       = useState(1);
     const [submitting,setSubmitting]= useState(false);
     const [successMsg,setSuccessMsg]= useState('');
 
@@ -86,34 +85,32 @@ function ItemDetailInner() {
 
     async function addToCart() {
         if (!item || item.stockStatus === 'out_of_stock') return;
-        if (qty < 1) return;
         setSubmitting(true);
         setSuccessMsg('');
         setErrorMsg('');
         try {
-            // The cart API appends one row per "Add" log event, so for quantity N
-            // we submit N events. Same contract the customer page uses.
-            for (let i = 0; i < qty; i++) {
-                const info = {
-                    itemID:        item.ItemID,
-                    CustomerEmail: email,
-                    action:        'Add',
-                    timestamp:     dayjs().format('YYYY-MM-DD HH:mm:ss'),
-                };
-                const res  = await fetch('/api/cart', {
-                    method:  'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body:    JSON.stringify(info),
-                });
-                const data = await res.json();
-                if (!data.success) {
-                    setErrorMsg(data.message || data.error || 'Failed to add to cart.');
-                    return;
-                }
+            // Cart API appends one "Add" row per call. We issue exactly one
+            // here — click again for more. Batching into a loop here collides
+            // on UpdateCart's (email, item, timestamp) PK at same-second precision.
+            const info = {
+                itemID:        item.ItemID,
+                CustomerEmail: email,
+                action:        'Add',
+                timestamp:     dayjs().format('YYYY-MM-DD HH:mm:ss'),
+            };
+            const res  = await fetch('/api/cart', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify(info),
+            });
+            const data = await res.json();
+            if (!data.success) {
+                setErrorMsg(data.message || data.error || 'Failed to add to cart.');
+                return;
             }
-            setSuccessMsg(`Added ${qty} × ${item.Name} to cart.`);
+            setSuccessMsg(`Added ${item.Name} to cart.`);
             // Optimistic local update so the badge flips to low/out-of-stock promptly.
-            setItem(prev => prev ? { ...prev, Quantity: Math.max(0, prev.Quantity - qty) } : prev);
+            setItem(prev => prev ? { ...prev, Quantity: Math.max(0, prev.Quantity - 1) } : prev);
         } catch (err) {
             console.error('Add to cart error:', err);
             setErrorMsg('Failed to add to cart.');
@@ -179,33 +176,6 @@ function ItemDetailInner() {
                             </p>
 
                             <div className="mt-8 flex items-center gap-3">
-                                <label className="text-sm font-medium text-slate-700">Qty</label>
-                                <div className="flex items-center border border-slate-300 rounded-lg overflow-hidden">
-                                    <button
-                                        type="button"
-                                        onClick={() => setQty(q => Math.max(1, q - 1))}
-                                        className="px-3 py-2 text-slate-600 hover:bg-slate-50"
-                                        disabled={submitting}
-                                    >
-                                        –
-                                    </button>
-                                    <input
-                                        type="number"
-                                        min={1}
-                                        max={Math.max(1, item.Quantity)}
-                                        value={qty}
-                                        onChange={(e) => setQty(Math.max(1, Math.min(Number(e.target.value) || 1, Math.max(1, item.Quantity))))}
-                                        className="w-16 text-center px-2 py-2 focus:outline-none text-slate-900"
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() => setQty(q => Math.min(Math.max(1, item.Quantity), q + 1))}
-                                        className="px-3 py-2 text-slate-600 hover:bg-slate-50"
-                                        disabled={submitting}
-                                    >
-                                        +
-                                    </button>
-                                </div>
                                 <button
                                     onClick={addToCart}
                                     disabled={submitting || item.stockStatus === 'out_of_stock' || !email}
@@ -219,6 +189,9 @@ function ItemDetailInner() {
                                         ? 'Out of Stock'
                                         : submitting ? 'Adding…' : 'Add to Cart'}
                                 </button>
+                                <span className="text-xs text-slate-500">
+                                    Click again to add more.
+                                </span>
                             </div>
 
                             {!email && (

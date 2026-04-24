@@ -122,6 +122,17 @@ function DashboardInner() {
         setMaxDraft(urlMax);
     }, [urlQ, urlMin, urlMax]);
 
+    // Debounce the search box — commit to the URL ~350ms after the user
+    // stops typing so every keystroke doesn't trigger a request.
+    useEffect(() => {
+        const next = searchDraft.trim();
+        if (next === urlQ) return;
+        const t = setTimeout(() => {
+            updateParams({ q: next || null, page: 1 });
+        }, 350);
+        return () => clearTimeout(t);
+    }, [searchDraft, urlQ, updateParams]);
+
     // Fetch catalog whenever any URL-level filter changes.
     useEffect(() => {
         let cancelled = false;
@@ -181,21 +192,11 @@ function DashboardInner() {
         return () => { cancelled = true; };
     }, []);
 
-    async function updateItem(item: Item, delta: number) {
-        try {
-            await fetch('/api/items', {
-                method:  'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body:    JSON.stringify({ itemID: item.ItemID, delta }),
-            });
-        } catch (err) {
-            console.error('Failed to update item:', err);
-        }
-    }
-
     async function handleCart(item: Item) {
         if (item.stockStatus === 'out_of_stock') return;
         try {
+            // Stock is decremented at checkout (owned by Shrikar), so Add to Cart
+            // only appends to the cart log here — no POST /api/items call.
             const info = {
                 itemID:        item.ItemID,
                 CustomerEmail: email,
@@ -209,7 +210,8 @@ function DashboardInner() {
             });
             const data = await res.json();
             if (data.success) {
-                updateItem(item, -1);
+                // Optimistic UI decrement so the badge reacts immediately.
+                // Real stock is refreshed from the server on next catalog fetch.
                 setItems(prev =>
                     prev.map(p =>
                         p.ItemID === item.ItemID
@@ -235,6 +237,8 @@ function DashboardInner() {
 
     const sortValue = `${urlSort}:${urlOrder}`;
 
+    // Fallback for pressing Enter in any filter input — commits whatever is
+    // in the drafts immediately (bypassing the debounce timer).
     const onSearchSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         updateParams({
@@ -243,6 +247,15 @@ function DashboardInner() {
             maxPrice: maxDraft.trim()    || null,
             page:     1,
         });
+    };
+
+    const commitMinPrice = () => {
+        const next = minDraft.trim();
+        if (next !== urlMin) updateParams({ minPrice: next || null, page: 1 });
+    };
+    const commitMaxPrice = () => {
+        const next = maxDraft.trim();
+        if (next !== urlMax) updateParams({ maxPrice: next || null, page: 1 });
     };
 
     const onCategoryChange = (value: string) => {
@@ -325,14 +338,17 @@ function DashboardInner() {
                     </div>
                 </div>
 
-                {/* Filter bar */}
+                {/* Filter bar — every control commits on its own:
+                     - search: debounced (see effect above)
+                     - category / sort: on change
+                     - price min/max: on blur, plus Enter anywhere submits the form. */}
                 <form onSubmit={onSearchSubmit} className="bg-white rounded-2xl shadow-sm p-4 border border-slate-200 mb-6 grid grid-cols-1 md:grid-cols-12 gap-3">
                     <input
                         type="text"
                         value={searchDraft}
                         onChange={(e) => setSearchDraft(e.target.value)}
                         placeholder="Search items..."
-                        className="md:col-span-4 px-4 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-300 text-slate-900 placeholder-slate-400"
+                        className="md:col-span-5 px-4 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-300 text-slate-900 placeholder-slate-400"
                     />
                     <select
                         value={urlCategory}
@@ -352,6 +368,7 @@ function DashboardInner() {
                         step="0.01"
                         value={minDraft}
                         onChange={(e) => setMinDraft(e.target.value)}
+                        onBlur={commitMinPrice}
                         placeholder="Min price"
                         className="md:col-span-2 px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-300 text-slate-900 placeholder-slate-400"
                     />
@@ -361,15 +378,10 @@ function DashboardInner() {
                         step="0.01"
                         value={maxDraft}
                         onChange={(e) => setMaxDraft(e.target.value)}
+                        onBlur={commitMaxPrice}
                         placeholder="Max price"
                         className="md:col-span-2 px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-300 text-slate-900 placeholder-slate-400"
                     />
-                    <button
-                        type="submit"
-                        className="md:col-span-1 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition"
-                    >
-                        Apply
-                    </button>
                     <select
                         value={sortValue}
                         onChange={(e) => onSortChange(e.target.value)}

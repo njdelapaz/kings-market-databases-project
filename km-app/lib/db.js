@@ -10,8 +10,15 @@ if (process.env.DB_SOCKET_PATH) {
   dbConfig.socketPath = process.env.DB_SOCKET_PATH;
   dbConfig.enableCleartextPlugin = true;
 } else {
-  dbConfig.host = process.env.DB_HOST || '127.0.0.1';
+  const host = process.env.DB_HOST || '127.0.0.1';
+  dbConfig.host = host;
   dbConfig.port = parseInt(process.env.DB_PORT || '3306', 10);
+  // Local MySQL installs typically don't have SSL enabled; requesting TLS
+  // there errors out with "Server does not support secure connection".
+  // Only request TLS for remote hosts (e.g. Cloud SQL public IP).
+  if (host !== '127.0.0.1' && host !== 'localhost') {
+    dbConfig.ssl = { rejectUnauthorized: false };
+  }
 }
 
 const db = mysql.createPool(dbConfig);
