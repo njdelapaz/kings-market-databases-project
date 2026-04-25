@@ -47,7 +47,7 @@ CREATE TABLE `Item_R1` (
 
 -- Customer orders header
 CREATE TABLE `CustomerOrder` (
-  `OrderID`       int(11)      NOT NULL,
+  `OrderID`       int(11)      NOT NULL AUTO_INCREMENT,
   `CustomerEmail` varchar(255) NOT NULL,
   `Timestamp`     datetime     NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;

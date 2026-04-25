@@ -4,11 +4,13 @@ import { verifyToken, COOKIE_NAME } from '@/lib/auth';
 const ROUTE_POLICY = [
   { prefix: '/storekeeper',     roles: ['storekeeper'] },
   { prefix: '/customer',        roles: ['customer'] },
+  { prefix: '/profile',         roles: ['customer'] },
   { prefix: '/api/cart',        roles: ['customer', 'storekeeper'] },
   { prefix: '/api/checkout',    roles: ['customer'] },
   { prefix: '/api/orders',      roles: ['customer', 'storekeeper'] },
   { prefix: '/api/paymentInfo', roles: ['customer'] },
   { prefix: '/api/items',       roles: ['customer', 'storekeeper'] },
+  { prefix: '/api/profile',     roles: ['customer'] },
 ];
 
 export async function proxy(request) {
@@ -53,11 +55,15 @@ export const config = {
   matcher: [
     '/customer/:path*',
     '/storekeeper/:path*',
+    '/profile',
+    '/profile/:path*',
     '/api/cart/:path*',
     '/api/checkout/:path*',
     '/api/orders/:path*',
     '/api/paymentInfo/:path*',
     '/api/items/:path*',
     '/api/items',
+    '/api/profile',
+    '/api/profile/:path*',
   ],
 };
