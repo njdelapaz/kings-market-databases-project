@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { verifyToken } from '@/lib/auth';
-import middleware from '../middleware.js';
+import { proxy as middleware } from '../proxy.js';
 import { NextResponse } from 'next/server';
 
 vi.mock('@/lib/auth', () => ({
