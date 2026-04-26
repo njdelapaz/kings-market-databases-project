@@ -116,6 +116,17 @@ export async function GET(request) {
        LEFT JOIN Item_R1 i ON i.ItemID = oi.ItemID`
     );
 
+    // Item request summary
+    const [itemRequestStatusRows] = await db.query(
+      `SELECT Status, COUNT(*) AS Count FROM ItemRequest GROUP BY Status`
+    );
+    const [recentItemRequestRows] = await db.query(
+      `SELECT ID, CustomerEmail, Name, Status, ReviewedBy, ReviewedAt
+       FROM ItemRequest
+       ORDER BY ID DESC
+       LIMIT 5`
+    );
+
     return NextResponse.json({
       success: true,
       report: {
@@ -123,6 +134,10 @@ export async function GET(request) {
         recentOperations,
         recentInventoryUpdates,
         transactionSummary: transactionSummaryRows[0] || { OrdersCount: 0, EstimatedRevenue: 0 },
+        itemRequestSummary: {
+          statusCounts: itemRequestStatusRows,
+          recent: recentItemRequestRows,
+        },
       },
     });
   } catch (error) {
