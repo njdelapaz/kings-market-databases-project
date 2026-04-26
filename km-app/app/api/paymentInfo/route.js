@@ -24,7 +24,8 @@ export async function POST(request){
 
 export async function PUT(request){
     try{
-        const {customerEmail, type, provider, last4, expMonth, expYear} = await request.json();
+        const CustomerEmail = request.headers.get('x-user-email');
+        const {type, provider, last4, expMonth, expYear} = await request.json();
         // need the values(type), values(provider), etc because of the "on duplicate key update" instruction.
         await db.query(
             `INSERT INTO PaymentInfo (CustomerEmail, Type, Provider, Last4, ExpMonth, ExpYear) 
@@ -35,7 +36,7 @@ export async function PUT(request){
             Last4=VALUES(Last4),
             ExpMonth=VALUES(ExpMonth),
             ExpYear=VALUES(ExpYear)`,
-            [customerEmail, type, provider, last4, expMonth, expYear]
+            [CustomerEmail, type, provider, last4, expMonth, expYear]
         )
         return NextResponse.json({ success: true, message: 'Payment Info Added Successfully!' });
 

@@ -23,7 +23,7 @@ type PaymentInfo = {
 export default function Cart(){
     const [cart, setCart] = useState<Record<string, CartItem>>({});
     const router = useRouter();
-    const params = useSearchParams();
+    
     const [paymentInfo, setPaymentInfo] = useState<PaymentInfo[] | null>(null);
     const [paymentLoading, setPaymentLoading] = useState(true);
     const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -189,7 +189,6 @@ export default function Cart(){
             console.log("within the function!!!");
             // take form data.
             const paymentData = {
-                customerEmail: params.get('email'),
                 type: (document.getElementById("Type") as HTMLInputElement)?.value.trim(),
                 provider: (document.getElementById("Provider") as HTMLInputElement)?.value.trim(),
                 last4: (document.getElementById("Last4") as HTMLInputElement)?.value.trim(),
