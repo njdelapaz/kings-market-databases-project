@@ -27,6 +27,17 @@ type ReportData = {
     OrdersCount: number;
     EstimatedRevenue: string | number;
   };
+  itemRequestSummary: {
+    statusCounts: Array<{ Status: string; Count: number }>;
+    recent: Array<{
+      ID: number;
+      CustomerEmail: string;
+      Name: string;
+      Status: string;
+      ReviewedBy: string | null;
+      ReviewedAt: string | null;
+    }>;
+  };
 };
 
 function StorekeeperReportsInner() {
@@ -151,6 +162,61 @@ function StorekeeperReportsInner() {
                 ))}
               </tbody>
             </table>
+          )}
+        </div>
+
+        {/* Item Request Summary */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-slate-800">Item Request Summary</h2>
+            <a href="/storekeeper/item-requests" className="text-sm text-indigo-600 font-semibold hover:underline">
+              Manage Requests →
+            </a>
+          </div>
+          {loading ? (
+            <p className="text-slate-500">Loading item requests...</p>
+          ) : (
+            <>
+              <div className="flex gap-3 flex-wrap mb-5">
+                {(['pending','approved','rejected'] as const).map(s => {
+                  const row = report?.itemRequestSummary?.statusCounts?.find(r => r.Status === s);
+                  const count = Number(row?.Count ?? 0);
+                  const colours: Record<string, string> = {
+                    pending:  'bg-amber-50  border-amber-200  text-amber-700',
+                    approved: 'bg-green-50  border-green-200  text-green-700',
+                    rejected: 'bg-red-50    border-red-200    text-red-700',
+                  };
+                  return (
+                    <div key={s} className={`flex-1 min-w-[100px] rounded-xl border px-4 py-3 ${colours[s]}`}>
+                      <p className="text-xs uppercase tracking-wide font-semibold">{s}</p>
+                      <p className="text-2xl font-bold mt-0.5">{count}</p>
+                    </div>
+                  );
+                })}
+              </div>
+              {(report?.itemRequestSummary?.recent?.length ?? 0) > 0 && (
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-slate-500 border-b border-slate-200">
+                      <th className="py-2 pr-4">Item</th>
+                      <th className="py-2 pr-4">Customer</th>
+                      <th className="py-2 pr-4">Status</th>
+                      <th className="py-2 pr-4">Reviewed By</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {report?.itemRequestSummary?.recent?.map(req => (
+                      <tr key={req.ID} className="border-b border-slate-100 text-slate-700">
+                        <td className="py-2 pr-4">{req.Name}</td>
+                        <td className="py-2 pr-4">{req.CustomerEmail}</td>
+                        <td className="py-2 pr-4 capitalize">{req.Status}</td>
+                        <td className="py-2 pr-4">{req.ReviewedBy ?? '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </>
           )}
         </div>
 

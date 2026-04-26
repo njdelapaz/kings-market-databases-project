@@ -30,10 +30,32 @@ export async function GET(request) {
     }
 
     try {
+        const { searchParams } = new URL(request.url);
+        const statusFilter = searchParams.get('status') || '';
+        const sortBy       = searchParams.get('sort')   || 'date';
+
+        const VALID_STATUSES = ['pending', 'approved', 'rejected'];
+        const whereClauses = [];
+        const params = [];
+
+        if (statusFilter && VALID_STATUSES.includes(statusFilter)) {
+            whereClauses.push('ir.Status = ?');
+            params.push(statusFilter);
+        }
+
+        const where = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : '';
+
+        const orderBy = sortBy === 'name'
+            ? 'ir.Name ASC, ir.ID DESC'
+            : 'ir.ID DESC'; // default: newest first
+
         const [rows] = await db.query(
-            `SELECT ir.ID, ir.CustomerEmail, ir.Name, ir.Description
+            `SELECT ir.ID, ir.CustomerEmail, ir.Name, ir.Description,
+                    ir.Status, ir.ReviewedBy, ir.ReviewedAt
              FROM ItemRequest ir
-             ORDER BY ir.ID DESC`
+             ${where}
+             ORDER BY ${orderBy}`,
+            params
         );
         return NextResponse.json({ success: true, requests: rows });
     } catch (err) {
