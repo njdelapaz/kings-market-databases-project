@@ -126,15 +126,14 @@ export async function POST(request) {
   let connection;
   try {
     const body = await request.json();
-    const sku = body?.sku?.trim();
     const name = body?.name?.trim();
     const category = body?.category?.trim() || null;
     const quantity = Number(body?.quantity);
     const price = Number(body?.price);
     const isSelling = body?.isSelling === undefined ? 1 : body.isSelling ? 1 : 0;
 
-    if (!sku || !name) {
-      return badRequest('SKU and name are required.');
+    if (!name) {
+      return badRequest('Name is required.');
     }
     if (!Number.isFinite(quantity) || quantity < 0) {
       return badRequest('Quantity must be a non-negative number.');
@@ -143,30 +142,35 @@ export async function POST(request) {
       return badRequest('Price must be a non-negative number.');
     }
 
+    // Item_R2 must exist before Item_R1 when fk_item_r1_r2 is present; match import behavior.
+    const categoryValue = category || 'Uncategorized';
+
     connection = await db.getConnection();
     await connection.beginTransaction();
 
-    const [insertResult] = await connection.query(
-      `INSERT INTO Item_R1 (SKU, Name, Quantity, Price, IsSelling)
-       VALUES (?, ?, ?, ?, ?)`,
-      [sku, name, quantity, price, isSelling]
+    await connection.query(
+      `INSERT INTO Item_R2 (Name, Category)
+       VALUES (?, ?)
+       ON DUPLICATE KEY UPDATE Category = VALUES(Category)`,
+      [name, categoryValue]
     );
 
-    if (category) {
-      await connection.query(
-        `INSERT INTO Item_R2 (Name, Category)
-         VALUES (?, ?)
-         ON DUPLICATE KEY UPDATE Category = VALUES(Category)`,
-        [name, category]
-      );
-    }
+    // SKU is GENERATED from ItemID in the deployed schema — assign next ItemID only; never insert SKU.
+    const [[{ nextId }]] = await connection.query(
+      'SELECT COALESCE(MAX(ItemID), 0) + 1 AS nextId FROM Item_R1 FOR UPDATE'
+    );
+    await connection.query(
+      `INSERT INTO Item_R1 (ItemID, Name, Quantity, Price, IsSelling)
+       VALUES (?, ?, ?, ?, ?)`,
+      [nextId, name, quantity, price, isSelling]
+    );
 
     await connection.commit();
 
     return NextResponse.json({
       success: true,
-      message: 'Item created successfully.',
-      itemId: insertResult.insertId,
+      message: `Item created successfully. SKU is assigned automatically (e.g. KM-${String(nextId).padStart(6, '0')}).`,
+      itemId: nextId,
     });
   } catch (error) {
     if (connection) {
@@ -174,14 +178,23 @@ export async function POST(request) {
     }
 
     if (error?.code === 'ER_DUP_ENTRY') {
-      return badRequest('SKU must be unique.');
+      return badRequest('Could not create item: a unique key conflict (e.g. duplicate id). Retry or contact an admin.');
+    }
+    if (error?.code === 'ER_CHECK_CONSTRAINT_VIOLATED') {
+      return badRequest('Database rejected the row (check quantity/price are valid).');
+    }
+    if (error?.code === 'ER_NO_REFERENCED_ROW_2') {
+      return badRequest(
+        'Could not create item: a required related row is missing (e.g. category / item name linkage).'
+      );
     }
 
     console.error('Failed to create admin item:', error);
-    return NextResponse.json(
-      { success: false, message: 'Failed to create item.' },
-      { status: 500 }
-    );
+    const detail =
+      typeof error?.sqlMessage === 'string' && error.sqlMessage.length < 220
+        ? error.sqlMessage
+        : 'Failed to create item.';
+    return NextResponse.json({ success: false, message: detail }, { status: 500 });
   } finally {
     connection?.release();
   }

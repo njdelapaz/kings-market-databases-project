@@ -51,7 +51,6 @@ function DashboardInner() {
     const [isExporting, setIsExporting] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [newItem, setNewItem] = useState({
-        sku: '',
         name: '',
         category: '',
         quantity: '0',
@@ -174,7 +173,6 @@ function DashboardInner() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    sku: newItem.sku,
                     name: newItem.name,
                     category: newItem.category,
                     quantity: Number(newItem.quantity),
@@ -190,7 +188,6 @@ function DashboardInner() {
 
             setStatusMsg('Item added successfully.');
             setNewItem({
-                sku: '',
                 name: '',
                 category: '',
                 quantity: '0',
@@ -646,7 +643,6 @@ function DashboardInner() {
                     <form onSubmit={handleCreateItem} className="bg-white rounded-2xl shadow-sm p-6 border border-slate-200 mb-6">
                         <h2 className="text-lg font-semibold text-slate-800 mb-4">Add New Inventory Item</h2>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                            <input value={newItem.sku} onChange={(e) => setNewItem(prev => ({ ...prev, sku: e.target.value }))} placeholder="SKU" className="px-3 py-2 rounded-lg border border-slate-300" />
                             <input value={newItem.name} onChange={(e) => setNewItem(prev => ({ ...prev, name: e.target.value }))} placeholder="Name" className="px-3 py-2 rounded-lg border border-slate-300" />
                             <input value={newItem.category} onChange={(e) => setNewItem(prev => ({ ...prev, category: e.target.value }))} placeholder="Category" className="px-3 py-2 rounded-lg border border-slate-300" />
                             <input type="number" min="0" step="1" value={newItem.quantity} onChange={(e) => setNewItem(prev => ({ ...prev, quantity: e.target.value }))} placeholder="Quantity" className="px-3 py-2 rounded-lg border border-slate-300" />
