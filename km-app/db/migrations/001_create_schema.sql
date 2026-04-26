@@ -1,6 +1,6 @@
 -- 001_create_schema.sql
 -- Creates all tables without PKs, FKs, or indexes (those are in 002).
--- Exception: AdminDataOperation retains its inline PK/KEYs because AUTO_INCREMENT requires a PK.
+-- Exception: AUTO_INCREMENT columns need inline keys when their tables are created.
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 
@@ -49,7 +49,8 @@ CREATE TABLE `Item_R1` (
 CREATE TABLE `CustomerOrder` (
   `OrderID`       int(11)      NOT NULL AUTO_INCREMENT,
   `CustomerEmail` varchar(255) NOT NULL,
-  `Timestamp`     datetime     NOT NULL DEFAULT current_timestamp()
+  `Timestamp`     datetime     NOT NULL DEFAULT current_timestamp(),
+  KEY `idx_customerorder_orderid` (`OrderID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- Order line items
