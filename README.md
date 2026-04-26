@@ -2,6 +2,20 @@
 
 Database Systems class project for Kings Market: a pre-order and pickup workflow backed by MySQL.
 
+<img width="1512" height="823" alt="image" src="https://github.com/user-attachments/assets/e5ad9089-f270-45cd-b242-3f460e2182bb" />
+
+&nbsp;
+
+<img width="1512" height="823" alt="image" src="https://github.com/user-attachments/assets/bf0a485c-7bfa-4018-8862-9eb4d6cb0775" />
+
+&nbsp;
+
+<img width="1512" height="823" alt="image" src="https://github.com/user-attachments/assets/8ebef7c1-67e1-455c-bc12-9a4ba6630835" />
+
+&nbsp;
+
+<img width="1512" height="823" alt="image" src="https://github.com/user-attachments/assets/39148ffa-8853-4e7d-978a-e93e406eb562" />
+
 ## Current Schema Source
 
 - Main schema file: `hgr9ba_b.sql`
