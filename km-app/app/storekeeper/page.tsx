@@ -272,10 +272,6 @@ function DashboardInner() {
         setImportMsg('');
         setErrorMsg('');
 
-        if (!storekeeperEmail) {
-            setErrorMsg('Missing storekeeper email in URL. Please log in again.');
-            return;
-        }
         if (!importFile) {
             setImportMsg('Choose a file to import.');
             return;
@@ -303,7 +299,7 @@ function DashboardInner() {
                     format: selectedFormat,
                     content,
                     filename: importFile.name,
-                    storekeeperEmail,
+                    ...(storekeeperEmail ? { storekeeperEmail } : {}),
                 }),
             });
             const data = await res.json();
@@ -326,18 +322,13 @@ function DashboardInner() {
     const handleExportInventory = async (format: 'csv' | 'json') => {
         setExportMsg('');
         setErrorMsg('');
-        if (!storekeeperEmail) {
-            setErrorMsg('Missing storekeeper email in URL. Please log in again.');
-            return;
-        }
-
         setIsExporting(true);
         try {
             const qs = new URLSearchParams({
                 format,
                 includeInactive: showInactive ? 'true' : 'false',
-                storekeeperEmail,
             });
+            if (storekeeperEmail) qs.set('storekeeperEmail', storekeeperEmail);
 
             const res = await fetch(`/api/admin/export/inventory?${qs.toString()}`);
             if (!res.ok) {
@@ -383,6 +374,58 @@ function DashboardInner() {
         }
     };
 
+    const handleExportTransactions = async (format: 'csv' | 'json') => {
+        setExportMsg('');
+        setErrorMsg('');
+        setIsExporting(true);
+        try {
+            const qs = new URLSearchParams({ format });
+            if (storekeeperEmail) qs.set('storekeeperEmail', storekeeperEmail);
+
+            const res = await fetch(`/api/admin/export/transactions?${qs.toString()}`);
+            if (!res.ok) {
+                let message = 'Transaction export failed.';
+                try {
+                    const err = await res.json();
+                    message = err.message || message;
+                } catch {
+                    // ignore json parse errors for non-json responses
+                }
+                setExportMsg(message);
+                return;
+            }
+
+            if (format === 'csv') {
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `transactions_export_${new Date().toISOString().slice(0, 10)}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+            } else {
+                const data = await res.json();
+                const blob = new Blob([JSON.stringify(data.data ?? [], null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = data.filename || `transactions_export_${new Date().toISOString().slice(0, 10)}.json`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+            }
+            setExportMsg(`Exported transactions as ${format.toUpperCase()}.`);
+        } catch (error) {
+            console.error('Transaction export failed:', error);
+            setExportMsg('Transaction export failed.');
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
     return (
         <div className="min-h-screen bg-indigo-600 p-4 md:p-8">
             <div className="max-w-6xl mx-auto">
@@ -406,6 +449,12 @@ function DashboardInner() {
                             className='mt-2 p-3 font-semibold text-blue-500 hover:bg-slate-50 hover:text-black rounded-2xl cursor-pointer'
                         >
                             Add New Item
+                        </button>
+                        <button
+                            onClick={() => router.push(`/storekeeper/reports?name=${encodeURIComponent(params.get('name') || '')}&email=${encodeURIComponent(storekeeperEmail)}`)}
+                            className='mt-2 p-3 font-semibold text-blue-500 hover:bg-slate-50 hover:text-black rounded-2xl cursor-pointer'
+                        >
+                            Reports
                         </button>
                         <button
                             onClick={logout}
@@ -507,7 +556,7 @@ function DashboardInner() {
 
                 <div className="bg-white rounded-2xl shadow-sm p-5 border border-slate-200 mb-6">
                     <h2 className="text-lg font-semibold text-slate-800 mb-3">Import / Export Inventory</h2>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
                         <form onSubmit={handleImportInventory} className="border border-slate-200 rounded-xl p-4">
                             <h3 className="text-sm font-semibold text-slate-700 mb-3">Import (CSV/JSON)</h3>
                             <div className="flex flex-col gap-3">
@@ -557,6 +606,31 @@ function DashboardInner() {
                             </div>
                             <p className="mt-3 text-xs text-slate-500">
                                 Export respects current active/inactive toggle.
+                            </p>
+                        </div>
+
+                        <div className="border border-slate-200 rounded-xl p-4">
+                            <h3 className="text-sm font-semibold text-slate-700 mb-3">Export Transactions</h3>
+                            <div className="flex flex-col sm:flex-row gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => handleExportTransactions('csv')}
+                                    disabled={isExporting}
+                                    className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-semibold hover:bg-slate-200 disabled:opacity-60"
+                                >
+                                    Export CSV
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleExportTransactions('json')}
+                                    disabled={isExporting}
+                                    className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-semibold hover:bg-slate-200 disabled:opacity-60"
+                                >
+                                    Export JSON
+                                </button>
+                            </div>
+                            <p className="mt-3 text-xs text-slate-500">
+                                Downloads customer order line-item history.
                             </p>
                         </div>
                     </div>

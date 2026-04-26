@@ -11,7 +11,16 @@ function buildStorekeeperFilter(storekeeperEmail, tableAlias = 'ado') {
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
-    const storekeeperEmail = String(searchParams.get('storekeeperEmail') || '').trim();
+    const storekeeperEmail =
+      String(searchParams.get('storekeeperEmail') || request.headers.get('x-user-email') || '').trim();
+    const role = request.headers.get('x-user-role');
+
+    if (role && role !== 'storekeeper') {
+      return NextResponse.json(
+        { success: false, message: 'Forbidden.' },
+        { status: 403 }
+      );
+    }
 
     const opFilter = buildStorekeeperFilter(storekeeperEmail, 'ado');
     const invFilter = buildStorekeeperFilter(storekeeperEmail, 'ui');
