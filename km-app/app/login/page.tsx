@@ -30,7 +30,7 @@ export default function LoginPage() {
 
       if (data.success) {
         if (role === 'storekeeper') {
-          router.push(`/storekeeper?name=${encodeURIComponent(data.user.Username)}&email=${encodeURIComponent(data.user.Email)}`);
+          router.push('/storekeeper');
         } else {
           router.push(`/${role}`);
         }

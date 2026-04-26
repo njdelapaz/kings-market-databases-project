@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import db from '@/lib/db';
 
+// Returns a 400 response with the given message string.
 function badRequest(message) {
   return NextResponse.json({ success: false, message }, { status: 400 });
 }
@@ -14,12 +15,14 @@ const SORT_COLUMNS = {
 const DEFAULT_PAGE_SIZE = 12;
 const MAX_PAGE_SIZE = 100;
 
+// Returns the value as a positive integer, or the fallback if missing/invalid.
 function parsePositiveInt(value, fallback) {
   if (value == null || value === '') return fallback;
   const n = Number(value);
   return Number.isInteger(n) && n > 0 ? n : fallback;
 }
 
+// Writes a row to UpdateInventory to audit a storekeeper action; falls back to the old column set if the Details column doesn't exist yet.
 async function logInventoryUpdate(queryable, { itemId, storekeeperEmail, action, details }) {
   if (!storekeeperEmail) return;
   try {
@@ -42,6 +45,7 @@ async function logInventoryUpdate(queryable, { itemId, storekeeperEmail, action,
   }
 }
 
+// Returns all inventory items for the admin panel with optional filters (inactive, search, category, price range), sorting, and pagination.
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -144,6 +148,7 @@ export async function GET(request) {
   }
 }
 
+// Creates a new item by inserting into Item_R2 (category) then Item_R1 (inventory) in a transaction, auto-assigning the next ItemID and logging the action.
 export async function POST(request) {
   let connection;
   try {

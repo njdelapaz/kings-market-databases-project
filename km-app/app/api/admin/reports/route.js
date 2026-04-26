@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import db from '@/lib/db';
 
+// Builds an optional WHERE clause and params array to filter by storekeeperEmail; returns empty clause if no email is provided.
 function buildStorekeeperFilter(storekeeperEmail, tableAlias = 'ado') {
   if (!storekeeperEmail) {
     return { clause: '', params: [] };
@@ -8,6 +9,7 @@ function buildStorekeeperFilter(storekeeperEmail, tableAlias = 'ado') {
   return { clause: `WHERE ${tableAlias}.StorekeeperEmail = ?`, params: [storekeeperEmail] };
 }
 
+// Fetches the 10 most recent inventory update events with human-readable action labels; falls back to the legacy column set if migration 009 hasn't been applied.
 async function getRecentInventoryUpdates(invFilter) {
   try {
     const [rows] = await db.query(
@@ -61,6 +63,7 @@ async function getRecentInventoryUpdates(invFilter) {
   }
 }
 
+// Aggregates operation status counts, recent admin operations, recent inventory updates, overall transaction/revenue totals, and item request summaries into one report payload.
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);

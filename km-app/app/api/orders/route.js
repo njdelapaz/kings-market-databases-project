@@ -54,6 +54,7 @@ async function fetchCustomerOrderSummaries(customerEmail, limit, offset) {
     }
 }
 
+// Returns paginated order history for the logged-in customer by querying summary and line-item views, then merging items into their parent orders.
 export async function GET(request){
     const CustomerEmail = request.headers.get('x-user-email');
     const role = request.headers.get('x-user-role');

@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server';
 import db from '@/lib/db';
 
+// Returns a 400 response with the given message string.
 function badRequest(message) {
   return NextResponse.json({ success: false, message }, { status: 400 });
 }
 
+// Writes a row to UpdateInventory to audit a storekeeper action; falls back to the old column set if the Details column doesn't exist yet.
 async function logInventoryUpdate(queryable, { itemId, storekeeperEmail, action, details }) {
   if (!storekeeperEmail) return;
   try {
@@ -27,6 +29,7 @@ async function logInventoryUpdate(queryable, { itemId, storekeeperEmail, action,
   }
 }
 
+// Updates any combination of name, category, quantity, price, or IsSelling for an item in a transaction; logs the change type (Adjust/Stop/Restock) to UpdateInventory.
 export async function PATCH(request, { params }) {
   let connection;
   try {
@@ -174,6 +177,7 @@ export async function PATCH(request, { params }) {
   }
 }
 
+// Soft-deletes an item by setting IsSelling=0 (keeps it in the DB) and logs a Stop action to UpdateInventory.
 export async function DELETE(request, { params }) {
   try {
     const resolvedParams = await params;
