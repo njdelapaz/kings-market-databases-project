@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 
 type ReportData = {
   operationStatus: Array<{ Status: string; Count: number }>;
@@ -42,22 +42,30 @@ type ReportData = {
 
 function StorekeeperReportsInner() {
   const router = useRouter();
-  const params = useSearchParams();
-  const name = params.get('name') || 'Storekeeper';
-  const storekeeperEmail = params.get('email') || '';
+  const [name,             setName]             = useState('Storekeeper');
+  const [storekeeperEmail, setStorekeeperEmail] = useState('');
 
   const [report, setReport] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
 
+  useEffect(() => {
+    fetch('/api/me')
+      .then(r => r.json())
+      .then(data => {
+        if (data.success) {
+          setName(data.username ?? 'Storekeeper');
+          setStorekeeperEmail(data.email ?? '');
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   async function getReportData() {
     try {
       setLoading(true);
       setErrorMsg('');
-      const emailQuery = storekeeperEmail
-        ? `?storekeeperEmail=${encodeURIComponent(storekeeperEmail)}`
-        : '';
-      const res = await fetch(`/api/admin/reports${emailQuery}`);
+      const res = await fetch('/api/admin/reports');
       const data = await res.json();
 
       if (!res.ok || !data.success) {
@@ -77,7 +85,8 @@ function StorekeeperReportsInner() {
   useEffect(() => {
     getReportData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storekeeperEmail]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const estimatedRevenue = Number(report?.transactionSummary?.EstimatedRevenue || 0).toFixed(2);
   const ordersCount = Number(report?.transactionSummary?.OrdersCount || 0);
@@ -95,7 +104,7 @@ function StorekeeperReportsInner() {
             </p>
           </div>
           <button
-            onClick={() => router.push(`/storekeeper?name=${encodeURIComponent(name)}`)}
+            onClick={() => router.push('/storekeeper')}
             className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg font-semibold hover:bg-slate-200 transition"
           >
             Back to Dashboard
