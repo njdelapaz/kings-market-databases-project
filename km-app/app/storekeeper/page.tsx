@@ -23,6 +23,8 @@ function DashboardInner() {
     const [statusMsg, setStatusMsg] = useState('');
     const [errorMsg, setErrorMsg] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [itemRequests,  setItemRequests] = useState<{ ID: number; CustomerEmail: string; Name: string; Description: string | null }[]>([]);
+    const [reqLoading,    setReqLoading]   = useState(true);
     const [newItem, setNewItem] = useState({
         sku: '',
         name: '',
@@ -67,6 +69,14 @@ function DashboardInner() {
         getItems();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [showInactive]);
+
+    useEffect(() => {
+        fetch('/api/item-requests')
+            .then(r => r.json())
+            .then(data => { if (data.success) setItemRequests(data.requests); })
+            .catch(() => {})
+            .finally(() => setReqLoading(false));
+    }, []);
 
     const loadMore = () => setVisibleCount(prev => prev + 12);
 
@@ -346,6 +356,39 @@ function DashboardInner() {
                         <p className="text-slate-400">Searching the warehouse for items...</p>
                     </div>
                 )}
+
+                {/* Item Requests */}
+                <div className="mt-12">
+                    <h2 className="text-2xl font-extrabold text-white mb-4 tracking-tight">Customer Item Requests</h2>
+                    {reqLoading && (
+                        <div className="bg-white rounded-2xl shadow-sm p-8 text-center border border-slate-200">
+                            <div className="w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto" />
+                        </div>
+                    )}
+                    {!reqLoading && itemRequests.length === 0 && (
+                        <div className="bg-white rounded-2xl shadow-sm p-8 text-center border border-slate-200">
+                            <p className="text-slate-400">No item requests yet.</p>
+                        </div>
+                    )}
+                    {!reqLoading && itemRequests.length > 0 && (
+                        <div className="flex flex-col gap-3">
+                            {itemRequests.map(req => (
+                                <div key={req.ID} className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+                                    <div className="flex items-start justify-between gap-4">
+                                        <div>
+                                            <p className="font-bold text-slate-900">{req.Name}</p>
+                                            <p className="text-xs text-slate-400 mt-0.5">{req.CustomerEmail}</p>
+                                            {req.Description && (
+                                                <p className="text-sm text-slate-600 mt-2">{req.Description}</p>
+                                            )}
+                                        </div>
+                                        <span className="text-xs text-slate-400 shrink-0">#{req.ID}</span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );

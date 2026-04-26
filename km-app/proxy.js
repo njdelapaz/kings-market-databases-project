@@ -12,6 +12,8 @@ const ROUTE_POLICY = [
   { prefix: '/api/paymentInfo', roles: ['customer'] },
   { prefix: '/api/items',       roles: ['customer', 'storekeeper'] },
   { prefix: '/api/profile',     roles: ['customer'] },
+  { prefix: '/itemRequest',      roles: ['customer'] },
+  { prefix: '/api/item-requests', roles: ['customer', 'storekeeper'] },
 ];
 
 export async function proxy(request) {
@@ -67,5 +69,9 @@ export const config = {
     '/api/items',
     '/api/profile',
     '/api/profile/:path*',
+    '/itemRequest',
+    '/itemRequest/:path*',
+    '/api/item-requests',
+    '/api/item-requests/:path*',
   ],
 };
