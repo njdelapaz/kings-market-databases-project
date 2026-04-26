@@ -3,8 +3,63 @@ import db from '@/lib/db'
 
 const PAGE_SIZE = 10;
 
+async function fetchCustomerOrderSummaries(customerEmail, limit, offset) {
+    try {
+        const [rows] = await db.query(
+            `SELECT
+                co.OrderID,
+                co.Timestamp AS OrderTimestamp,
+                co.Status,
+                co.CancelReason,
+                COALESCE(COUNT(oi.ItemID), 0) AS ItemCount,
+                COALESCE(SUM(oi.Quantity), 0) AS TotalUnits,
+                COALESCE(ROUND(SUM(oi.Quantity * i.Price), 2), 0) AS OrderTotal
+             FROM CustomerOrder co
+             LEFT JOIN OrderItem oi
+               ON oi.OrderID = co.OrderID
+              AND oi.CustomerEmail = co.CustomerEmail
+             LEFT JOIN Item_R1 i ON i.ItemID = oi.ItemID
+             WHERE co.CustomerEmail = ?
+             GROUP BY co.OrderID, co.Timestamp, co.Status, co.CancelReason
+             ORDER BY co.Timestamp DESC
+             LIMIT ? OFFSET ?`,
+            [customerEmail, limit, offset]
+        );
+        return rows;
+    } catch (error) {
+        if (error?.code !== 'ER_BAD_FIELD_ERROR') throw error;
+        const [legacyRows] = await db.query(
+            `SELECT
+                co.OrderID,
+                co.Timestamp AS OrderTimestamp,
+                COALESCE(COUNT(oi.ItemID), 0) AS ItemCount,
+                COALESCE(SUM(oi.Quantity), 0) AS TotalUnits,
+                COALESCE(ROUND(SUM(oi.Quantity * i.Price), 2), 0) AS OrderTotal
+             FROM CustomerOrder co
+             LEFT JOIN OrderItem oi
+               ON oi.OrderID = co.OrderID
+              AND oi.CustomerEmail = co.CustomerEmail
+             LEFT JOIN Item_R1 i ON i.ItemID = oi.ItemID
+             WHERE co.CustomerEmail = ?
+             GROUP BY co.OrderID, co.Timestamp
+             ORDER BY co.Timestamp DESC
+             LIMIT ? OFFSET ?`,
+            [customerEmail, limit, offset]
+        );
+        return legacyRows.map((row) => ({
+            ...row,
+            Status: 'pending',
+            CancelReason: null,
+        }));
+    }
+}
+
 export async function GET(request){
     const CustomerEmail = request.headers.get('x-user-email');
+    const role = request.headers.get('x-user-role');
+    if (role && role !== 'customer') {
+        return NextResponse.json({ success: false, message: 'Forbidden.' }, { status: 403 });
+    }
 
     const { searchParams } = new URL(request.url);
     const page   = Math.max(1, parseInt(searchParams.get('page')  || '1', 10));
@@ -12,9 +67,10 @@ export async function GET(request){
     const offset = (page - 1) * limit;
 
     try{
-        // Total order count for pagination metadata
         const [[{ total }]] = await db.query(
-            `SELECT COUNT(*) AS total FROM v_customer_order_summary WHERE CustomerEmail = ?`,
+            `SELECT COUNT(*) AS total
+             FROM CustomerOrder
+             WHERE CustomerEmail = ?`,
             [CustomerEmail]
         );
 
@@ -22,26 +78,28 @@ export async function GET(request){
             return NextResponse.json({ success: true, orders: [], total: 0, page, totalPages: 0 });
         }
 
-        // Paginated summary rows (one per order, with pre-computed total)
-        const [summaryRows] = await db.query(
-            `SELECT OrderID, OrderTimestamp, ItemCount, TotalUnits, OrderTotal
-             FROM v_customer_order_summary
-             WHERE CustomerEmail = ?
-             ORDER BY OrderTimestamp DESC
-             LIMIT ? OFFSET ?`,
-            [CustomerEmail, limit, offset]
-        );
+        const summaryRows = await fetchCustomerOrderSummaries(CustomerEmail, limit, offset);
 
         const orderIds = summaryRows.map(r => r.OrderID);
 
         // Fetch item details only for the orders on this page
-        const [itemRows] = await db.query(
-            `SELECT OrderID, ItemID, ItemName AS Name, Quantity, ItemPrice AS Price, LineTotal
-             FROM v_customer_order_history
-             WHERE CustomerEmail = ? AND OrderID IN (?)
-             ORDER BY OrderID DESC`,
-            [CustomerEmail, orderIds]
-        );
+        const [itemRows] = orderIds.length
+            ? await db.query(
+                `SELECT
+                    oi.OrderID,
+                    oi.ItemID,
+                    i.Name,
+                    oi.Quantity,
+                    i.Price,
+                    ROUND(oi.Quantity * i.Price, 2) AS LineTotal
+                 FROM OrderItem oi
+                 JOIN Item_R1 i ON i.ItemID = oi.ItemID
+                 WHERE oi.CustomerEmail = ?
+                   AND oi.OrderID IN (?)
+                 ORDER BY oi.OrderID DESC, oi.ItemID ASC`,
+                [CustomerEmail, orderIds]
+            )
+            : [[]];
 
         // Merge items into their summary order
         const itemsByOrder = {};
@@ -59,6 +117,8 @@ export async function GET(request){
         const orders = summaryRows.map(s => ({
             OrderID:    s.OrderID,
             Timestamp:  s.OrderTimestamp,
+            Status: s.Status || 'pending',
+            CancelReason: s.CancelReason || null,
             ItemCount:  s.ItemCount,
             TotalUnits: s.TotalUnits,
             OrderTotal: s.OrderTotal,
