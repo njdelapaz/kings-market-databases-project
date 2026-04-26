@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import db from '@/lib/db';
 
+// Wraps a cell value in double-quotes and escapes internal quotes if the value contains commas, quotes, or newlines.
 function escapeCsv(value) {
   const str = String(value ?? '');
   if (str.includes(',') || str.includes('"') || str.includes('\n')) {
@@ -9,6 +10,7 @@ function escapeCsv(value) {
   return str;
 }
 
+// Converts an array of transaction row objects into a CSV string with a fixed header row.
 function toCsv(rows) {
   const headers = [
     'OrderID',
@@ -38,6 +40,7 @@ function toCsv(rows) {
   return lines.join('\n');
 }
 
+// Records a completed transaction export in AdminDataOperation for audit purposes.
 async function logOperation({ storekeeperEmail, format, sourceFilename, notes }) {
   await db.query(
     `INSERT INTO AdminDataOperation
@@ -47,6 +50,7 @@ async function logOperation({ storekeeperEmail, format, sourceFilename, notes })
   );
 }
 
+// Joins all orders with their line items and item prices, then returns the result as JSON or a downloadable CSV, logging the export to AdminDataOperation.
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);

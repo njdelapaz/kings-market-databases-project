@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server';
 import db from '@/lib/db';
 
+// Returns true if the phone string contains only digits, spaces, and common symbols and is 7–20 chars long.
 function isValidPhone(phone) {
   return typeof phone === 'string' && /^[0-9+()\-\s]{7,20}$/.test(phone.trim());
 }
 
+// Reads the customer's profile (email, phone, username) from the v_customer_profile view.
 export async function GET(request) {
   const email = request.headers.get('x-user-email');
 
@@ -31,6 +33,7 @@ export async function GET(request) {
   }
 }
 
+// Updates the customer's username and/or phone number in a transaction, checking for uniqueness conflicts across both Customer_R1 and Customer_R2.
 export async function PATCH(request) {
   const email = request.headers.get('x-user-email');
 
