@@ -65,9 +65,9 @@ function DashboardInner() {
         price: '0',
         isSelling: true,
     });
-    const params = useSearchParams();
+    const searchParams = useSearchParams();
     const router = useRouter();
-    const storekeeperEmail = params.get('email') ?? '';
+    const storekeeperEmail = searchParams.get('email') ?? '';
     const pageSize = 12;
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
@@ -403,7 +403,7 @@ function DashboardInner() {
                 {/* Header Card */}
                 <div className="bg-white rounded-2xl shadow-sm p-8 border border-slate-200 mb-8 flex justify-between">
                     <h1 className="mt-2 p-3 text-slate-600">
-                        Hey <span className="font-semibold text-blue-600">{params.get('name')}</span>!
+                        Hey <span className="font-semibold text-blue-600">{searchParams.get('name')}</span>!
                     </h1>
                     <div className="flex justify-between gap-1">
                         <button
@@ -413,13 +413,13 @@ function DashboardInner() {
                             Add New Item
                         </button>
                         <button
-                            onClick={() => router.push(`/storekeeper/orders?name=${encodeURIComponent(params.get('name') || '')}&email=${encodeURIComponent(storekeeperEmail)}`)}
+                            onClick={() => router.push(`/storekeeper/orders?name=${encodeURIComponent(searchParams.get('name') || '')}&email=${encodeURIComponent(storekeeperEmail)}`)}
                             className='mt-2 p-3 font-semibold text-blue-500 hover:bg-slate-50 hover:text-black rounded-2xl cursor-pointer'
                         >
                             Orders
                         </button>
                         <button
-                            onClick={() => router.push(`/storekeeper/create-account?name=${encodeURIComponent(params.get('name') || '')}&email=${encodeURIComponent(storekeeperEmail)}`)}
+                            onClick={() => router.push(`/storekeeper/create-account?name=${encodeURIComponent(searchParams.get('name') || '')}&email=${encodeURIComponent(storekeeperEmail)}`)}
                             className='mt-2 p-3 font-semibold text-blue-500 hover:bg-slate-50 hover:text-black rounded-2xl cursor-pointer'
                         >
                             Create Storekeeper
@@ -431,7 +431,7 @@ function DashboardInner() {
                             Item Requests
                         </button>
                         <button
-                            onClick={() => router.push(`/storekeeper/reports?name=${encodeURIComponent(params.get('name') || '')}&email=${encodeURIComponent(storekeeperEmail)}`)}
+                            onClick={() => router.push(`/storekeeper/reports?name=${encodeURIComponent(searchParams.get('name') || '')}&email=${encodeURIComponent(storekeeperEmail)}`)}
                             className='mt-2 p-3 font-semibold text-blue-500 hover:bg-slate-50 hover:text-black rounded-2xl cursor-pointer'
                         >
                             Reports
