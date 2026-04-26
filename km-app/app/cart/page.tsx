@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import dayjs from 'dayjs';
+import { error } from 'console';
 
 type CartItem = {
     ItemID: number;
@@ -22,8 +23,12 @@ type PaymentInfo = {
 export default function Cart(){
     const [cart, setCart] = useState<Record<string, CartItem>>({});
     const router = useRouter();
+    
     const [paymentInfo, setPaymentInfo] = useState<PaymentInfo[] | null>(null);
     const [paymentLoading, setPaymentLoading] = useState(true);
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [paymentErrors, setPaymentErrors] = useState<Record<string, string>>({});
+    const [errorState, setErrorState] = useState("");
     const [itemErrors, setItemErrors] = useState<Record<string, string>>({});
     const [updating, setUpdating] = useState<Record<string, boolean>>({});
     const inFlight = useRef<Set<number>>(new Set());
@@ -137,6 +142,79 @@ export default function Cart(){
             }
         } catch(err){
             console.error(err);
+        }
+    }
+
+    async function validate(){
+        // validate payment form fields.
+        const errors = {};
+        const type = (document.getElementById("Type") as HTMLInputElement)?.value.trim();
+        const provider = (document.getElementById("Provider") as HTMLInputElement)?.value.trim();
+        const last4Digits = (document.getElementById("Last4") as HTMLInputElement)?.value.trim();
+        const expMonth = (document.getElementById("ExpMonth") as HTMLInputElement)?.value.trim();
+        const expYear = (document.getElementById("ExpYear") as HTMLInputElement)?.value.trim();
+
+        if(type != "credit" && type != "debit"){
+            errors.Type = "Card Type must be credit or debit (lowercase).";
+            console.log("Card Type must be credit or debit (lowercase).");
+        }
+        if(!provider){
+            errors.Provider = "Provider required!";
+            console.log("Provider required!");
+        }
+        if(!/^\d{4}$/.test(last4Digits)){
+            errors.Last4 = "Invalid card number!";
+            console.log("Invalid card number!");
+        }
+        if(!/^([1-9]|1[0-2])$/.test(expMonth)){
+            errors.ExpMonth = "Invalid Month!";
+            console.log("Invalid Month!");
+        }
+        if(!/^\d{4}$/.test(expYear) || Number(expYear) < new Date().getFullYear()){
+            errors.ExpYear = "Invalid Year Value!";
+            console.log("Invalid Year Value!");
+        }
+        setPaymentErrors(errors);
+        console.log(Object.values(errors).length);
+        return Object.values(errors).length !== 0 // if length is > 0, then we have error!
+
+    }
+
+    // function to save payment info from form data.
+    async function savePaymentInfo(){
+        // only proceed if fields are valid. otherwise return error.
+        // await the results of validate, since its an async method.
+        const validationResults = await validate();
+        if(!validationResults){
+            console.log("within the function!!!");
+            // take form data.
+            const paymentData = {
+                type: (document.getElementById("Type") as HTMLInputElement)?.value.trim(),
+                provider: (document.getElementById("Provider") as HTMLInputElement)?.value.trim(),
+                last4: (document.getElementById("Last4") as HTMLInputElement)?.value.trim(),
+                expMonth: (document.getElementById("ExpMonth") as HTMLInputElement)?.value.trim(),
+                expYear: (document.getElementById("ExpYear") as HTMLInputElement)?.value.trim(),
+            }
+
+            const res = await fetch('api/paymentInfo', {
+                method: "PUT",
+                headers: {"Content-Type":"application/json"},
+                body: JSON.stringify(paymentData)
+            })
+
+            const data = await res.json();
+            if(data.success){
+                console.log("Payment Info Processed!");
+                setShowPaymentModal(false);
+                location.reload();
+            }
+            else{
+                setErrorState(data.error)
+            }
+        }
+        else{
+            console.log("Error with validate method!");
+            // don't reset paymentErrors here! Otherwise you lose the value!
         }
     }
 
@@ -283,7 +361,7 @@ export default function Cart(){
                                     ))}
                                     <div className="col-span-2 pt-2">
                                         <button
-                                            onClick={() => router.push("/account/payment")}
+                                            onClick={() => setShowPaymentModal(true)}
                                             className="text-indigo-600 text-sm font-semibold hover:text-indigo-800 transition-colors"
                                         >
                                             Edit payment info →
@@ -294,7 +372,7 @@ export default function Cart(){
                                 <div className="text-center py-6">
                                     <p className="text-slate-500 mb-4">No payment method saved.</p>
                                     <button
-                                        onClick={() => router.push("/account/payment")}
+                                        onClick={() => setShowPaymentModal(true)}
                                         className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-semibold text-sm hover:bg-indigo-700 transition-colors"
                                     >
                                         Add Payment Method
@@ -341,6 +419,78 @@ export default function Cart(){
                     </div>
 
                 </div>
+
+
+                {/** payment modal info */}
+                {showPaymentModal && (
+                    <div 
+                        className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+                        onClick={() => setShowPaymentModal(false)}
+                    >
+                        <div 
+                            className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-lg"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <div>
+                            {console.log("paymentErrors at render:", paymentErrors)}
+                            {console.log("errorState at render:", errorState)}
+
+                            </div>
+                            {errorState && (
+                                <p className="text-sm text-red-400 font-medium text-center mb-2">{errorState}</p>
+                            )}
+                            {Object.keys(paymentErrors).length > 0 && (
+                                <div className='mb-4'>
+                                    Submission errors:
+                                    {Object.values(paymentErrors).map((err, idx) => (
+                                        <p key={idx} className="text-sm text-red-400 font-medium">- {err}</p>
+                                    ))}
+                                </div>
+                            )}
+                            <div className="flex items-center justify-between mb-6">
+                                <h2 className="text-xl font-bold text-slate-900">Add Payment Info</h2>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-1">Card Type</p>
+                                    <input id="Type" placeholder="credit / debit" className="w-full bg-slate-50 rounded-xl px-4 py-2.5 text-slate-800 text-sm border border-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-300" defaultValue={payment?.Type}/>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-1">Provider</p>
+                                    <input id="Provider" placeholder="Visa, Mastercard..." className="w-full bg-slate-50 rounded-xl px-4 py-2.5 text-slate-800 text-sm border border-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-300" defaultValue={payment?.Provider}/>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-1">Card Number (Last 4 Digits)</p>
+                                    <input id="Last4" placeholder="1234" maxLength={4} className="w-full bg-slate-50 rounded-xl px-4 py-2.5 text-slate-800 text-sm border border-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-300" defaultValue={payment?.Last4}/>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-1">Expiration Month (1 - 12)</p>
+                                    <input id="ExpMonth" placeholder="MM" maxLength={2} className="w-full bg-slate-50 rounded-xl px-4 py-2.5 text-slate-800 text-sm border border-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-300" defaultValue={payment?.ExpMonth}/>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-1">Expiration Year</p>
+                                    <input id="ExpYear" placeholder="YYYY" maxLength={4} className="w-full bg-slate-50 rounded-xl px-4 py-2.5 text-slate-800 text-sm border border-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-300" defaultValue={payment?.ExpYear}/>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-3 mt-6">
+                                <button
+                                    onClick={() => savePaymentInfo()}
+                                    className="flex-1 bg-indigo-600 text-white py-3 rounded-2xl font-bold text-sm hover:bg-indigo-700 transition-colors"
+                                >
+                                    Save
+                                </button>
+                                <button
+                                    onClick={() => setShowPaymentModal(false)}
+                                    className="px-6 py-3 rounded-2xl font-bold text-sm text-slate-500 border border-slate-200 hover:bg-slate-50 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

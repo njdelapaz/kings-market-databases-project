@@ -31,7 +31,7 @@ export async function POST(request){
             cartItems.flatMap((item) =>
                 Array.from({ length: item.TotalQuantity }, () =>
                     db.query(
-                        `INSERT INTO UpdateCart (CustomerEmail, ItemID, Action, Timestamp) VALUES (?, ?, 'Remove', ?)`,
+                        `INSERT INTO UpdateCart (CustomerEmail, ItemID, Action) VALUES (?, ?, 'Remove')`,
                         [customerEmail, item.ItemID, now]
                     )
                 )
