@@ -431,11 +431,6 @@ export default function Cart(){
                             className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-lg"
                             onClick={e => e.stopPropagation()}
                         >
-                            <div>
-                            {console.log("paymentErrors at render:", paymentErrors)}
-                            {console.log("errorState at render:", errorState)}
-
-                            </div>
                             {errorState && (
                                 <p className="text-sm text-red-400 font-medium text-center mb-2">{errorState}</p>
                             )}
