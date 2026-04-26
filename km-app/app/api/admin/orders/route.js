@@ -14,6 +14,33 @@ function parsePositiveInt(value, fallback) {
   return Number.isInteger(n) && n > 0 ? n : fallback;
 }
 
+async function fetchStatusHistory(orderIds) {
+  if (!orderIds.length) return {};
+  try {
+    const [rows] = await db.query(
+      `SELECT OrderID, OldStatus, NewStatus, CancelReason, UpdatedAt
+       FROM OrderStatusHistory
+       WHERE OrderID IN (?)
+       ORDER BY UpdatedAt DESC`,
+      [orderIds]
+    );
+    const historyByOrder = {};
+    for (const row of rows) {
+      if (!historyByOrder[row.OrderID]) historyByOrder[row.OrderID] = [];
+      historyByOrder[row.OrderID].push({
+        OldStatus: row.OldStatus,
+        NewStatus: row.NewStatus,
+        CancelReason: row.CancelReason,
+        UpdatedAt: row.UpdatedAt,
+      });
+    }
+    return historyByOrder;
+  } catch (error) {
+    if (error?.code === 'ER_NO_SUCH_TABLE') return {};
+    throw error;
+  }
+}
+
 async function fetchOrderSummaries(pageSize, offset) {
   try {
     const [rows] = await db.query(
@@ -120,6 +147,7 @@ export async function GET(request) {
           [orderIds]
         )
       : [[]];
+    const historyByOrder = await fetchStatusHistory(orderIds);
 
     const itemsByOrder = {};
     for (const item of itemRows) {
@@ -143,6 +171,7 @@ export async function GET(request) {
       TotalUnits: Number(row.TotalUnits || 0),
       OrderTotal: Number(row.OrderTotal || 0),
       Items: itemsByOrder[row.OrderID] || [],
+      StatusHistory: historyByOrder[row.OrderID] || [],
     }));
 
     return NextResponse.json({

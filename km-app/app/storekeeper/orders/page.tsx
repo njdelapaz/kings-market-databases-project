@@ -23,6 +23,12 @@ type StorekeeperOrder = {
   TotalUnits: number;
   OrderTotal: number;
   Items: OrderItem[];
+  StatusHistory?: Array<{
+    OldStatus: string | null;
+    NewStatus: string;
+    CancelReason: string | null;
+    UpdatedAt: string;
+  }>;
 };
 
 const STATUS_OPTIONS: { value: OrderStatus; label: string }[] = [
@@ -271,6 +277,20 @@ function StorekeeperOrdersInner() {
                           className="md:col-span-2 px-3 py-2 rounded-lg border border-slate-300"
                         />
                       </div>
+                      {(order.StatusHistory?.length ?? 0) > 0 && (
+                        <div className="rounded-xl border border-slate-200 p-3 bg-slate-50">
+                          <p className="text-xs uppercase tracking-wide font-semibold text-slate-500 mb-2">
+                            Status timeline
+                          </p>
+                          <div className="space-y-1">
+                            {order.StatusHistory?.map((entry, idx) => (
+                              <p key={`${order.OrderID}-history-${idx}`} className="text-xs text-slate-600">
+                                {new Date(entry.UpdatedAt).toLocaleString()} &mdash; {entry.NewStatus.replaceAll('_', ' ')}
+                              </p>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                       <div className="flex justify-end">
                         <button
                           onClick={() => updateOrderStatus(order)}

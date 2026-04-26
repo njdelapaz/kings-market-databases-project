@@ -54,6 +54,34 @@ async function fetchCustomerOrderSummaries(customerEmail, limit, offset) {
     }
 }
 
+async function fetchCustomerStatusHistory(customerEmail, orderIds) {
+    if (!orderIds.length) return {};
+    try {
+        const [rows] = await db.query(
+            `SELECT OrderID, OldStatus, NewStatus, CancelReason, UpdatedAt
+             FROM OrderStatusHistory
+             WHERE CustomerEmail = ?
+               AND OrderID IN (?)
+             ORDER BY UpdatedAt DESC`,
+            [customerEmail, orderIds]
+        );
+        const historyByOrder = {};
+        for (const row of rows) {
+            if (!historyByOrder[row.OrderID]) historyByOrder[row.OrderID] = [];
+            historyByOrder[row.OrderID].push({
+                OldStatus: row.OldStatus,
+                NewStatus: row.NewStatus,
+                CancelReason: row.CancelReason,
+                UpdatedAt: row.UpdatedAt,
+            });
+        }
+        return historyByOrder;
+    } catch (error) {
+        if (error?.code === 'ER_NO_SUCH_TABLE') return {};
+        throw error;
+    }
+}
+
 // Returns paginated order history for the logged-in customer by querying summary and line-item views, then merging items into their parent orders.
 export async function GET(request){
     const CustomerEmail = request.headers.get('x-user-email');
@@ -82,6 +110,7 @@ export async function GET(request){
         const summaryRows = await fetchCustomerOrderSummaries(CustomerEmail, limit, offset);
 
         const orderIds = summaryRows.map(r => r.OrderID);
+        const historyByOrder = await fetchCustomerStatusHistory(CustomerEmail, orderIds);
 
         // Fetch item details only for the orders on this page
         const [itemRows] = orderIds.length
@@ -124,6 +153,7 @@ export async function GET(request){
             TotalUnits: s.TotalUnits,
             OrderTotal: s.OrderTotal,
             Items:      itemsByOrder[s.OrderID] ?? [],
+            StatusHistory: historyByOrder[s.OrderID] ?? [],
         }));
 
         const totalPages = Math.ceil(total / limit);
