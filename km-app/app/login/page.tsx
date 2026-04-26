@@ -29,7 +29,11 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (data.success) {
-        router.push(`/${role}`);
+        if (role === 'storekeeper') {
+          router.push(`/storekeeper?name=${encodeURIComponent(data.user.Username)}&email=${encodeURIComponent(data.user.Email)}`);
+        } else {
+          router.push(`/${role}`);
+        }
       } else {
         setError(data.message || data.error || 'Login failed.');
       }
