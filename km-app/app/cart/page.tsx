@@ -129,6 +129,7 @@ export default function Cart(){
     }
 
     async function checkout(){
+        setErrorState('');
         try{
             const res = await fetch('/api/checkout', {
                 method: 'POST',
@@ -139,9 +140,20 @@ export default function Cart(){
             if(data.success){
                 setCart({});
                 router.back();
+            } else if (res.status === 409 && data.error === 'insufficient_stock') {
+                const available = data.available ?? 0;
+                setErrorState(
+                    available === 0
+                        ? `"${data.itemName}" is out of stock. Please remove it from your cart.`
+                        : `Only ${available} of "${data.itemName}" left in stock. Please adjust your quantity.`
+                );
+                await refetchCart();
+            } else {
+                setErrorState(data.error ?? 'Checkout failed. Please try again.');
             }
         } catch(err){
             console.error(err);
+            setErrorState('Network error. Please try again.');
         }
     }
 
