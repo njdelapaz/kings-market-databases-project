@@ -20,6 +20,28 @@ function parsePositiveInt(value, fallback) {
   return Number.isInteger(n) && n > 0 ? n : fallback;
 }
 
+async function logInventoryUpdate(queryable, { itemId, storekeeperEmail, action, details }) {
+  if (!storekeeperEmail) return;
+  try {
+    await queryable.query(
+      `INSERT INTO UpdateInventory (ItemID, StorekeeperEmail, Action, Details)
+       VALUES (?, ?, ?, ?)`,
+      [itemId, storekeeperEmail, action, details || null]
+    );
+  } catch (err) {
+    // Backward compatibility for DBs that have not added UpdateInventory.Details yet.
+    if (err?.code === 'ER_BAD_FIELD_ERROR') {
+      await queryable.query(
+        `INSERT INTO UpdateInventory (ItemID, StorekeeperEmail, Action)
+         VALUES (?, ?, ?)`,
+        [itemId, storekeeperEmail, action]
+      );
+      return;
+    }
+    throw err;
+  }
+}
+
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -126,6 +148,10 @@ export async function POST(request) {
   let connection;
   try {
     const body = await request.json();
+    const { searchParams } = new URL(request.url);
+    const storekeeperEmail = String(
+      request.headers.get('x-user-email') || body?.storekeeperEmail || searchParams.get('storekeeperEmail') || ''
+    ).trim();
     const name = body?.name?.trim();
     const category = body?.category?.trim() || null;
     const quantity = Number(body?.quantity);
@@ -164,6 +190,15 @@ export async function POST(request) {
        VALUES (?, ?, ?, ?, ?)`,
       [nextId, name, quantity, price, isSelling]
     );
+
+    if (storekeeperEmail) {
+      await logInventoryUpdate(connection, {
+        itemId: nextId,
+        storekeeperEmail,
+        action: isSelling ? 'Restock' : 'Stop',
+        details: isSelling ? 'Created item and marked available for sale' : 'Created item as unavailable for sale',
+      });
+    }
 
     await connection.commit();
 

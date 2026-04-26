@@ -5,15 +5,42 @@ function badRequest(message) {
   return NextResponse.json({ success: false, message }, { status: 400 });
 }
 
+async function logInventoryUpdate(queryable, { itemId, storekeeperEmail, action, details }) {
+  if (!storekeeperEmail) return;
+  try {
+    await queryable.query(
+      `INSERT INTO UpdateInventory (ItemID, StorekeeperEmail, Action, Details)
+       VALUES (?, ?, ?, ?)`,
+      [itemId, storekeeperEmail, action, details || null]
+    );
+  } catch (err) {
+    // Backward compatibility for DBs that have not added UpdateInventory.Details yet.
+    if (err?.code === 'ER_BAD_FIELD_ERROR') {
+      await queryable.query(
+        `INSERT INTO UpdateInventory (ItemID, StorekeeperEmail, Action)
+         VALUES (?, ?, ?)`,
+        [itemId, storekeeperEmail, action]
+      );
+      return;
+    }
+    throw err;
+  }
+}
+
 export async function PATCH(request, { params }) {
   let connection;
   try {
-    const itemId = Number(params?.itemId);
+    const resolvedParams = await params;
+    const itemId = Number(resolvedParams?.itemId);
     if (!Number.isInteger(itemId) || itemId <= 0) {
       return badRequest('Invalid item id.');
     }
 
     const body = await request.json();
+    const { searchParams } = new URL(request.url);
+    const storekeeperEmail = String(
+      request.headers.get('x-user-email') || body?.storekeeperEmail || searchParams.get('storekeeperEmail') || ''
+    ).trim();
     const updates = [];
     const values = [];
 
@@ -60,7 +87,10 @@ export async function PATCH(request, { params }) {
     await connection.beginTransaction();
 
     const [existingRows] = await connection.query(
-      'SELECT ItemID, Name FROM Item_R1 WHERE ItemID = ?',
+      `SELECT i.ItemID, i.Name, i.Quantity, i.Price, i.IsSelling, c.Category
+       FROM Item_R1 i
+       LEFT JOIN Item_R2 c ON c.Name = i.Name
+       WHERE i.ItemID = ?`,
       [itemId]
     );
     if (!existingRows.length) {
@@ -90,6 +120,39 @@ export async function PATCH(request, { params }) {
       }
     }
 
+    if (storekeeperEmail) {
+      const changedFields = [];
+      const previousName = String(existingRows[0].Name ?? '');
+      const previousCategory = String(existingRows[0].Category ?? '');
+      const previousQuantity = Number(existingRows[0].Quantity);
+      const previousPrice = Number(existingRows[0].Price);
+      const nextName = hasName ? String(body.name).trim() : previousName;
+      const nextCategory = hasCategory ? String(body.category ?? '').trim() : previousCategory;
+      const nextQuantity =
+        body?.quantity !== undefined ? Number(body.quantity) : previousQuantity;
+      const nextPrice = body?.price !== undefined ? Number(body.price) : previousPrice;
+      if (hasName && nextName !== previousName) changedFields.push('name');
+      if (hasCategory && nextCategory !== previousCategory) changedFields.push('category');
+      if (body?.quantity !== undefined && nextQuantity !== previousQuantity) changedFields.push('quantity');
+      if (body?.price !== undefined && nextPrice !== previousPrice) changedFields.push('price');
+
+      const previousIsSelling = Number(existingRows[0].IsSelling) === 1;
+      const nextIsSelling =
+        body?.isSelling === undefined ? previousIsSelling : Boolean(body.isSelling);
+      let action = 'Adjust';
+      let details = changedFields.length
+        ? `Updated ${changedFields.join(', ')}`
+        : 'Updated item details';
+      if (previousIsSelling && !nextIsSelling) {
+        action = 'Stop';
+        details = 'Marked as unavailable for sale';
+      } else if (!previousIsSelling && nextIsSelling) {
+        action = 'Restock';
+        details = 'Marked as available for sale';
+      }
+      await logInventoryUpdate(connection, { itemId, storekeeperEmail, action, details });
+    }
+
     await connection.commit();
     return NextResponse.json({ success: true, message: 'Item updated successfully.' });
   } catch (error) {
@@ -113,7 +176,12 @@ export async function PATCH(request, { params }) {
 
 export async function DELETE(request, { params }) {
   try {
-    const itemId = Number(params?.itemId);
+    const resolvedParams = await params;
+    const itemId = Number(resolvedParams?.itemId);
+    const { searchParams } = new URL(request.url);
+    const storekeeperEmail = String(
+      request.headers.get('x-user-email') || searchParams.get('storekeeperEmail') || ''
+    ).trim();
     if (!Number.isInteger(itemId) || itemId <= 0) {
       return badRequest('Invalid item id.');
     }
@@ -125,6 +193,15 @@ export async function DELETE(request, { params }) {
 
     if (!result.affectedRows) {
       return NextResponse.json({ success: false, message: 'Item not found.' }, { status: 404 });
+    }
+
+    if (storekeeperEmail) {
+      await logInventoryUpdate(db, {
+        itemId,
+        storekeeperEmail,
+        action: 'Stop',
+        details: 'Marked as unavailable for sale',
+      });
     }
 
     return NextResponse.json({ success: true, message: 'Item removed from sale.' });

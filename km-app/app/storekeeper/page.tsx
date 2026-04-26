@@ -53,8 +53,8 @@ function DashboardInner() {
     const [newItem, setNewItem] = useState({
         name: '',
         category: '',
-        quantity: '0',
-        price: '0',
+        quantity: '',
+        price: '',
         isSelling: true,
     });
     const [editItem, setEditItem] = useState({
@@ -190,8 +190,8 @@ function DashboardInner() {
             setNewItem({
                 name: '',
                 category: '',
-                quantity: '0',
-                price: '0',
+                quantity: '',
+                price: '',
                 isSelling: true,
             });
             setShowAddForm(false);
@@ -232,33 +232,6 @@ function DashboardInner() {
         } catch (error) {
             console.error(error);
             setErrorMsg('Failed to update item.');
-        } finally {
-            setIsSubmitting(false);
-        }
-    }
-
-    const handleSoftDisable = async (itemId: number) => {
-        setStatusMsg('');
-        setErrorMsg('');
-        setIsSubmitting(true);
-        try {
-            const res = await fetch(`/api/admin/items/${itemId}`, {
-                method: 'DELETE',
-            });
-            const data = await res.json();
-            if (!res.ok || !data.success) {
-                setErrorMsg(data.message || 'Failed to remove item from sale.');
-                return;
-            }
-
-            setStatusMsg('Item removed from sale.');
-            if (editingItemId === itemId) {
-                setEditingItemId(null);
-            }
-            await getItems();
-        } catch (error) {
-            console.error(error);
-            setErrorMsg('Failed to remove item from sale.');
         } finally {
             setIsSubmitting(false);
         }
@@ -672,7 +645,10 @@ function DashboardInner() {
                 {/* Items Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                     {items.map((item) => (
-                        <div key={item.ItemID} className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col">
+                        <div
+                            key={item.ItemID}
+                            className={`bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col ${item.IsSelling === 0 ? 'opacity-70' : ''}`}
+                        >
                             <div className="p-5 flex-grow">
                                 <div className="flex justify-between items-start mb-2">
                                     <h3 className="text-lg font-bold text-slate-900 leading-tight">{item.Name}</h3>
@@ -682,6 +658,11 @@ function DashboardInner() {
                                         <span className="bg-slate-100 text-slate-500 text-[10px] uppercase tracking-wider font-bold px-2 py-1 rounded-full">Unavailable</span>
                                     )}
                                 </div>
+                                {item.IsSelling === 0 && (
+                                    <span className="inline-flex bg-amber-100 text-amber-800 text-[10px] uppercase tracking-wider font-bold px-2 py-1 rounded-full">
+                                        Not for Sale
+                                    </span>
+                                )}
                                 <p className="text-xs text-slate-500 mt-1">SKU: {item.SKU}</p>
                                 <p className="text-xs text-slate-500 mt-1">Category: {item.Category || 'N/A'}</p>
                                 <p className="text-2xl font-semibold text-blue-600 mt-2">${Number(item.Price).toFixed(2)}</p>
@@ -709,9 +690,6 @@ function DashboardInner() {
                                             </button>
                                             <button onClick={closeEdit} className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors">
                                                 Cancel
-                                            </button>
-                                            <button onClick={() => handleSoftDisable(item.ItemID)} disabled={isSubmitting} className="text-xs font-semibold text-red-600 hover:text-red-700 transition-colors disabled:opacity-60">
-                                                Remove from Sale
                                             </button>
                                         </div>
                                     </div>

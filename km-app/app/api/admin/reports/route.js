@@ -8,6 +8,59 @@ function buildStorekeeperFilter(storekeeperEmail, tableAlias = 'ado') {
   return { clause: `WHERE ${tableAlias}.StorekeeperEmail = ?`, params: [storekeeperEmail] };
 }
 
+async function getRecentInventoryUpdates(invFilter) {
+  try {
+    const [rows] = await db.query(
+      `SELECT
+          ui.StorekeeperEmail,
+          ui.ItemID,
+          i.Name AS ItemName,
+          ui.Action,
+          ui.Details,
+          CASE
+            WHEN ui.Action = 'Stop' THEN COALESCE(ui.Details, 'Marked as unavailable for sale')
+            WHEN ui.Action = 'Restock' THEN COALESCE(ui.Details, 'Marked as available for sale / restocked')
+            WHEN ui.Action = 'Adjust' THEN COALESCE(ui.Details, 'Updated item details')
+            ELSE ui.Action
+          END AS ActionLabel,
+          ui.Timestamp
+       FROM UpdateInventory ui
+       LEFT JOIN Item_R1 i ON i.ItemID = ui.ItemID
+       ${invFilter.clause}
+       ORDER BY ui.Timestamp DESC
+       LIMIT 10`,
+      invFilter.params
+    );
+    return rows;
+  } catch (error) {
+    // Backward compatibility for DBs that have not applied migration 009 yet.
+    if (error?.code !== 'ER_BAD_FIELD_ERROR') {
+      throw error;
+    }
+    const [legacyRows] = await db.query(
+      `SELECT
+          ui.StorekeeperEmail,
+          ui.ItemID,
+          i.Name AS ItemName,
+          ui.Action,
+          CASE
+            WHEN ui.Action = 'Stop' THEN 'Marked as unavailable for sale'
+            WHEN ui.Action = 'Restock' THEN 'Marked as available for sale / restocked'
+            WHEN ui.Action = 'Adjust' THEN 'Updated item details'
+            ELSE ui.Action
+          END AS ActionLabel,
+          ui.Timestamp
+       FROM UpdateInventory ui
+       LEFT JOIN Item_R1 i ON i.ItemID = ui.ItemID
+       ${invFilter.clause}
+       ORDER BY ui.Timestamp DESC
+       LIMIT 10`,
+      invFilter.params
+    );
+    return legacyRows;
+  }
+}
+
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -50,20 +103,7 @@ export async function GET(request) {
       opFilter.params
     );
 
-    const [recentInventoryUpdates] = await db.query(
-      `SELECT
-          ui.StorekeeperEmail,
-          ui.ItemID,
-          i.Name AS ItemName,
-          ui.Action,
-          ui.Timestamp
-       FROM UpdateInventory ui
-       LEFT JOIN Item_R1 i ON i.ItemID = ui.ItemID
-       ${invFilter.clause}
-       ORDER BY ui.Timestamp DESC
-       LIMIT 10`,
-      invFilter.params
-    );
+    const recentInventoryUpdates = await getRecentInventoryUpdates(invFilter);
 
     const [transactionSummaryRows] = await db.query(
       `SELECT
