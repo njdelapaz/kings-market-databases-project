@@ -43,6 +43,12 @@ function DashboardInner() {
     const [editingItemId, setEditingItemId] = useState<number | null>(null);
     const [statusMsg, setStatusMsg] = useState('');
     const [errorMsg, setErrorMsg] = useState('');
+    const [importMsg, setImportMsg] = useState('');
+    const [exportMsg, setExportMsg] = useState('');
+    const [importFormat, setImportFormat] = useState<'csv' | 'json'>('csv');
+    const [importFile, setImportFile] = useState<File | null>(null);
+    const [isImporting, setIsImporting] = useState(false);
+    const [isExporting, setIsExporting] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [newItem, setNewItem] = useState({
         sku: '',
@@ -61,6 +67,7 @@ function DashboardInner() {
     });
     const params = useSearchParams();
     const router = useRouter();
+    const storekeeperEmail = params.get('email') ?? '';
     const pageSize = 12;
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
@@ -260,6 +267,122 @@ function DashboardInner() {
         }
     }
 
+    const handleImportInventory = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setImportMsg('');
+        setErrorMsg('');
+
+        if (!storekeeperEmail) {
+            setErrorMsg('Missing storekeeper email in URL. Please log in again.');
+            return;
+        }
+        if (!importFile) {
+            setImportMsg('Choose a file to import.');
+            return;
+        }
+
+        const selectedFormat = importFormat;
+        if (selectedFormat === 'csv' && !importFile.name.toLowerCase().endsWith('.csv')) {
+            setImportMsg('Please choose a .csv file for CSV import.');
+            return;
+        }
+        if (selectedFormat === 'json' && !importFile.name.toLowerCase().endsWith('.json')) {
+            setImportMsg('Please choose a .json file for JSON import.');
+            return;
+        }
+
+        setIsImporting(true);
+        try {
+            const text = await importFile.text();
+            const content = selectedFormat === 'json' ? JSON.parse(text) : text;
+
+            const res = await fetch('/api/admin/import/inventory', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    format: selectedFormat,
+                    content,
+                    filename: importFile.name,
+                    storekeeperEmail,
+                }),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                setImportMsg(data.message || 'Import failed.');
+                return;
+            }
+
+            setImportMsg(`Import complete. Rows processed: ${data.rowsProcessed}.`);
+            setImportFile(null);
+            await getItems();
+        } catch (error) {
+            console.error('Import failed:', error);
+            setImportMsg('Import failed. Check file format and try again.');
+        } finally {
+            setIsImporting(false);
+        }
+    };
+
+    const handleExportInventory = async (format: 'csv' | 'json') => {
+        setExportMsg('');
+        setErrorMsg('');
+        if (!storekeeperEmail) {
+            setErrorMsg('Missing storekeeper email in URL. Please log in again.');
+            return;
+        }
+
+        setIsExporting(true);
+        try {
+            const qs = new URLSearchParams({
+                format,
+                includeInactive: showInactive ? 'true' : 'false',
+                storekeeperEmail,
+            });
+
+            const res = await fetch(`/api/admin/export/inventory?${qs.toString()}`);
+            if (!res.ok) {
+                let message = 'Export failed.';
+                try {
+                    const err = await res.json();
+                    message = err.message || message;
+                } catch {
+                    // ignore json parse errors for non-json responses
+                }
+                setExportMsg(message);
+                return;
+            }
+
+            if (format === 'csv') {
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `inventory_export_${new Date().toISOString().slice(0, 10)}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+            } else {
+                const data = await res.json();
+                const blob = new Blob([JSON.stringify(data.data ?? [], null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = data.filename || `inventory_export_${new Date().toISOString().slice(0, 10)}.json`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+            }
+            setExportMsg(`Exported inventory as ${format.toUpperCase()}.`);
+        } catch (error) {
+            console.error('Export failed:', error);
+            setExportMsg('Export failed.');
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
     return (
         <div className="min-h-screen bg-indigo-600 p-4 md:p-8">
             <div className="max-w-6xl mx-auto">
@@ -381,6 +504,69 @@ function DashboardInner() {
                         </button>
                     </div>
                 </form>
+
+                <div className="bg-white rounded-2xl shadow-sm p-5 border border-slate-200 mb-6">
+                    <h2 className="text-lg font-semibold text-slate-800 mb-3">Import / Export Inventory</h2>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                        <form onSubmit={handleImportInventory} className="border border-slate-200 rounded-xl p-4">
+                            <h3 className="text-sm font-semibold text-slate-700 mb-3">Import (CSV/JSON)</h3>
+                            <div className="flex flex-col gap-3">
+                                <select
+                                    value={importFormat}
+                                    onChange={(e) => setImportFormat(e.target.value as 'csv' | 'json')}
+                                    className="px-3 py-2 rounded-lg border border-slate-300 text-sm"
+                                >
+                                    <option value="csv">CSV</option>
+                                    <option value="json">JSON</option>
+                                </select>
+                                <input
+                                    type="file"
+                                    accept={importFormat === 'csv' ? '.csv,text/csv' : '.json,application/json'}
+                                    onChange={(e) => setImportFile(e.target.files?.[0] ?? null)}
+                                    className="text-sm text-slate-700"
+                                />
+                                <button
+                                    type="submit"
+                                    disabled={isImporting}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-60"
+                                >
+                                    {isImporting ? 'Importing...' : 'Run Import'}
+                                </button>
+                            </div>
+                        </form>
+
+                        <div className="border border-slate-200 rounded-xl p-4">
+                            <h3 className="text-sm font-semibold text-slate-700 mb-3">Export Inventory</h3>
+                            <div className="flex flex-col sm:flex-row gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => handleExportInventory('csv')}
+                                    disabled={isExporting}
+                                    className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-semibold hover:bg-slate-200 disabled:opacity-60"
+                                >
+                                    Export CSV
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleExportInventory('json')}
+                                    disabled={isExporting}
+                                    className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-semibold hover:bg-slate-200 disabled:opacity-60"
+                                >
+                                    Export JSON
+                                </button>
+                            </div>
+                            <p className="mt-3 text-xs text-slate-500">
+                                Export respects current active/inactive toggle.
+                            </p>
+                        </div>
+                    </div>
+
+                    {(importMsg || exportMsg) && (
+                        <p className="mt-4 text-sm text-slate-600">
+                            {importMsg || exportMsg}
+                        </p>
+                    )}
+                </div>
 
                 {showAddForm && (
                     <form onSubmit={handleCreateItem} className="bg-white rounded-2xl shadow-sm p-6 border border-slate-200 mb-6">
