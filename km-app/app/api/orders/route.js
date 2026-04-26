@@ -3,6 +3,7 @@ import db from '@/lib/db'
 
 const PAGE_SIZE = 10;
 
+// Returns paginated order history for the logged-in customer by querying summary and line-item views, then merging items into their parent orders.
 export async function GET(request){
     const CustomerEmail = request.headers.get('x-user-email');
 

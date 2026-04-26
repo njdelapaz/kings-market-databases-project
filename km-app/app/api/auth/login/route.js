@@ -3,6 +3,7 @@ import db from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import { signToken, COOKIE_NAME } from '@/lib/auth';
 
+// Looks up the user by role/username/email, verifies the bcrypt password, and sets an httpOnly JWT cookie on success.
 export async function POST(request) {
   const { role, username, email, password } = await request.json();
 

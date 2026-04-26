@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import db from '@/lib/db'
 
+// Locks each cart item's row, verifies stock, creates a CustomerOrder, inserts OrderItems, decrements inventory, and clears the cart — all in one transaction.
 export async function POST(request){
     const customerEmail = request.headers.get('x-user-email');
 

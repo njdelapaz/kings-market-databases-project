@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import db from '@/lib/db';
 
+// Inserts a new item request from the logged-in customer with a name and optional description.
 export async function POST(request) {
     const customerEmail = request.headers.get('x-user-email');
 
@@ -22,6 +23,7 @@ export async function POST(request) {
     }
 }
 
+// Returns all item requests for storekeeper review, optionally filtered by status and sorted by date or name; storekeeper only.
 export async function GET(request) {
     const role = request.headers.get('x-user-role');
 
