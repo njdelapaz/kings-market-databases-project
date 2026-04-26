@@ -38,6 +38,14 @@ type ReportData = {
       ReviewedAt: string | null;
     }>;
   };
+  topSellingItems: Array<{
+    ItemID: number;
+    ItemName: string;
+    UnitsSold: number;
+    Revenue: number | string;
+    SalesRank: number;
+    RevenueSharePct: number | string;
+  }>;
 };
 
 function StorekeeperReportsInner() {
@@ -175,6 +183,36 @@ function StorekeeperReportsInner() {
         </div>
 
         {/* Item Request Summary */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mb-8">
+          <h2 className="text-lg font-semibold text-slate-800 mb-4">Top Selling Items (Last 30 Days)</h2>
+          {loading ? (
+            <p className="text-slate-500">Loading sales analytics...</p>
+          ) : (
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="text-left text-slate-500 border-b border-slate-200">
+                  <th className="py-2 pr-4">Rank</th>
+                  <th className="py-2 pr-4">Item</th>
+                  <th className="py-2 pr-4">Units Sold</th>
+                  <th className="py-2 pr-4">Revenue</th>
+                  <th className="py-2 pr-4">Revenue Share</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(report?.topSellingItems || []).map((row) => (
+                  <tr key={row.ItemID} className="border-b border-slate-100 text-slate-700">
+                    <td className="py-2 pr-4">#{row.SalesRank}</td>
+                    <td className="py-2 pr-4">{row.ItemName}</td>
+                    <td className="py-2 pr-4">{row.UnitsSold}</td>
+                    <td className="py-2 pr-4">${Number(row.Revenue).toFixed(2)}</td>
+                    <td className="py-2 pr-4">{Number(row.RevenueSharePct).toFixed(2)}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mb-8">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-slate-800">Item Request Summary</h2>

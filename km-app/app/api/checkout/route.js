@@ -1,81 +1,70 @@
-import { NextResponse } from 'next/server'
-import db from '@/lib/db'
+import { NextResponse } from 'next/server';
+import db from '@/lib/db';
 
-// Locks each cart item's row, verifies stock, creates a CustomerOrder, inserts OrderItems, decrements inventory, and clears the cart — all in one transaction.
-export async function POST(request){
+// Advanced SQL integration:
+// - populate TempCart from UI cart payload
+// - call place_order_from_tempcart stored procedure
+// - rely on before_orderitem_insert trigger for stock validation + deduction
+export async function POST(request) {
     const customerEmail = request.headers.get('x-user-email');
+    const role = request.headers.get('x-user-role');
+    if (!customerEmail || (role && role !== 'customer')) {
+        return NextResponse.json({ success: false, error: 'Unauthorized.' }, { status: 401 });
+    }
 
     const conn = await db.getConnection();
-    try{
+    try {
         const { cart } = await request.json();
-
         if (!cart || Object.keys(cart).length === 0) {
-            conn.release();
-            return NextResponse.json({ error: 'Cart is empty.' }, { status: 400 });
+            return NextResponse.json({ success: false, error: 'Cart is empty.' }, { status: 400 });
         }
 
         const cartItems = Object.values(cart);
-
         await conn.beginTransaction();
 
-        // Lock each item row and verify sufficient stock before committing anything
-        for (const item of cartItems) {
-            const [[row]] = await conn.query(
-                `SELECT Quantity, Name FROM Item_R1 WHERE ItemID = ? FOR UPDATE`,
-                [item.ItemID]
-            );
-            if (!row || row.Quantity < item.TotalQuantity) {
-                await conn.rollback();
-                conn.release();
-                return NextResponse.json(
-                    {
-                        success: false,
-                        error: 'insufficient_stock',
-                        itemName: row?.Name ?? 'Unknown item',
-                        available: row?.Quantity ?? 0,
-                    },
-                    { status: 409 }
-                );
-            }
-        }
-
-        // Create the order if we have stock!
-        const [orderRes] = await conn.query(
-            `INSERT INTO CustomerOrder (CustomerEmail) VALUES (?)`,
-            [customerEmail]
-        );
-        const orderId = orderRes.insertId;
-
+        await conn.query('DELETE FROM TempCart WHERE CustomerEmail = ?', [customerEmail]);
         for (const item of cartItems) {
             await conn.query(
-                `INSERT INTO OrderItem (CustomerEmail, OrderID, ItemID, Quantity) VALUES (?,?,?,?)`,
-                [customerEmail, orderId, item.ItemID, item.TotalQuantity]
-            );
-            // Decrement stock inside the transaction
-            await conn.query(
-                `UPDATE Item_R1 SET Quantity = Quantity - ? WHERE ItemID = ?`,
-                [item.TotalQuantity, item.ItemID]
+                `INSERT INTO TempCart (CustomerEmail, ItemID, Quantity)
+                 VALUES (?, ?, ?)
+                 ON DUPLICATE KEY UPDATE Quantity = VALUES(Quantity)`,
+                [customerEmail, item.ItemID, item.TotalQuantity]
             );
         }
+
+        await conn.query('CALL place_order_from_tempcart(?, @new_order_id)', [customerEmail]);
+        const [[{ orderId }]] = await conn.query('SELECT @new_order_id AS orderId');
 
         const now = new Date();
         for (const item of cartItems) {
-            for (let i = 0; i < item.TotalQuantity; i++) {
+            for (let i = 0; i < item.TotalQuantity; i += 1) {
                 await conn.query(
-                    `INSERT INTO UpdateCart (CustomerEmail, ItemID, Action) VALUES (?, ?, 'Remove')`,
+                    `INSERT INTO UpdateCart (CustomerEmail, ItemID, Action, Timestamp)
+                     VALUES (?, ?, 'Remove', ?)`,
                     [customerEmail, item.ItemID, now]
                 );
             }
         }
 
         await conn.commit();
-        conn.release();
-
-        return NextResponse.json({ success: true, orderId });
-    } catch(err){
+        return NextResponse.json({ success: true, orderId: Number(orderId) });
+    } catch (err) {
         await conn.rollback();
-        conn.release();
+        if (err?.sqlState === '45000') {
+            return NextResponse.json({ success: false, error: err.message }, { status: 409 });
+        }
+        if (err?.code === 'ER_BAD_FIELD_ERROR' || err?.code === 'ER_SP_DOES_NOT_EXIST') {
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: 'Advanced checkout SQL is not installed. Run migration 014_advanced_sql_order_workflow.sql.',
+                },
+                { status: 409 }
+            );
+        }
         console.error('Checkout error:', err);
         return NextResponse.json({ success: false, error: 'Internal server error.' }, { status: 500 });
+    } finally {
+        conn.release();
     }
 }

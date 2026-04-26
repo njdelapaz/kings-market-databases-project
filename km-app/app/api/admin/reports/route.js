@@ -63,6 +63,51 @@ async function getRecentInventoryUpdates(invFilter) {
   }
 }
 
+// Advanced SQL (CTE + window functions) for storekeeper reports UI.
+async function getTopSellingItemsAdvanced() {
+  try {
+    const [rows] = await db.query(
+      `WITH item_sales AS (
+         SELECT
+           oi.ItemID,
+           i.Name AS ItemName,
+           SUM(oi.Quantity) AS UnitsSold,
+           ROUND(SUM(oi.Quantity * i.Price), 2) AS Revenue
+         FROM CustomerOrder co
+         JOIN OrderItem oi
+           ON oi.OrderID = co.OrderID
+          AND oi.CustomerEmail = co.CustomerEmail
+         JOIN Item_R1 i ON i.ItemID = oi.ItemID
+         WHERE co.Timestamp >= NOW() - INTERVAL 30 DAY
+         GROUP BY oi.ItemID, i.Name
+       ),
+       ranked AS (
+         SELECT
+           ItemID,
+           ItemName,
+           UnitsSold,
+           Revenue,
+           DENSE_RANK() OVER (ORDER BY UnitsSold DESC, Revenue DESC) AS SalesRank,
+           ROUND(
+             100 * Revenue / NULLIF(SUM(Revenue) OVER (), 0),
+             2
+           ) AS RevenueSharePct
+         FROM item_sales
+       )
+       SELECT ItemID, ItemName, UnitsSold, Revenue, SalesRank, RevenueSharePct
+       FROM ranked
+       ORDER BY SalesRank, ItemID
+       LIMIT 10`
+    );
+    return rows;
+  } catch (error) {
+    if (error?.code === 'ER_PARSE_ERROR') {
+      return [];
+    }
+    throw error;
+  }
+}
+
 // Aggregates operation status counts, recent admin operations, recent inventory updates, overall transaction/revenue totals, and item request summaries into one report payload.
 export async function GET(request) {
   try {
@@ -129,6 +174,7 @@ export async function GET(request) {
        ORDER BY ID DESC
        LIMIT 5`
     );
+    const topSellingItems = await getTopSellingItemsAdvanced();
 
     return NextResponse.json({
       success: true,
@@ -141,6 +187,7 @@ export async function GET(request) {
           statusCounts: itemRequestStatusRows,
           recent: recentItemRequestRows,
         },
+        topSellingItems,
       },
     });
   } catch (error) {

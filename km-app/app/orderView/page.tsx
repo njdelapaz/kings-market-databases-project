@@ -20,6 +20,12 @@ type Order = {
     TotalUnits: number;
     OrderTotal: number;
     Items: OrderItem[];
+    StatusHistory?: Array<{
+        OldStatus: string | null;
+        NewStatus: string;
+        CancelReason: string | null;
+        UpdatedAt: string;
+    }>;
 };
 
 const PAGE_SIZE = 10;
@@ -176,6 +182,20 @@ export default function Orders(){
 
                                     {openOrd === ord.OrderID && (
                                         <div className="border-t border-slate-100 divide-y divide-slate-100">
+                                            {(ord.StatusHistory?.length ?? 0) > 0 && (
+                                                <div className="px-6 py-4 bg-indigo-50">
+                                                    <p className="text-xs uppercase tracking-wide font-semibold text-indigo-700 mb-2">
+                                                        Status timeline
+                                                    </p>
+                                                    <div className="space-y-1">
+                                                        {ord.StatusHistory?.map((entry, idx) => (
+                                                            <p key={`${ord.OrderID}-status-${idx}`} className="text-xs text-indigo-700">
+                                                                {new Date(entry.UpdatedAt).toLocaleString()} &mdash; {entry.NewStatus.replaceAll('_', ' ')}
+                                                            </p>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
                                             {ord.Status === 'cancelled' && ord.CancelReason && (
                                                 <div className="px-6 py-4 bg-red-50 text-red-700">
                                                     <p className="text-xs uppercase tracking-wide font-semibold">Cancellation reason</p>
