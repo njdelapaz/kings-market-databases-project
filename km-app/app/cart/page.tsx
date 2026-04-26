@@ -139,6 +139,7 @@ export default function Cart(){
             const data = await res.json();
             if(data.success){
                 setCart({});
+                localStorage.setItem('checkoutSuccess', 'true');
                 router.back();
             } else if (res.status === 409 && data.error === 'insufficient_stock') {
                 const available = data.available ?? 0;
