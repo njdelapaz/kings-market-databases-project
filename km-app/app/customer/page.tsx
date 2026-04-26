@@ -331,9 +331,9 @@ function DashboardInner() {
                         <button onClick={() => router.push('/profile')} className="mt-2 p-3 font-semibold text-indigo-600 hover:text-black hover:bg-slate-50 rounded-2xl cursor-pointer">
                             Profile
                         </button>
-                        <h1 className="mt-2 p-3 font-semibold text-indigo-600 hover:text-black hover:bg-slate-50 rounded-2xl cursor-pointer">
+                        <button onClick={() => router.push('/itemRequest')} className="mt-2 p-3 font-semibold text-indigo-600 hover:text-black hover:bg-slate-50 rounded-2xl cursor-pointer">
                             Item Requests
-                        </h1>
+                        </button>
                         <button
                             onClick={logout}
                             className="mt-2 p-2 text-sm font-semibold border-transparent text-slate-600 rounded-lg hover:bg-slate-50 hover:text-red-600 hover:border-red-200 transition-all flex items-center gap-2"
