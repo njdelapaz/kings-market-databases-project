@@ -423,19 +423,22 @@ function DashboardInner() {
                     </h1>
                     <div className="flex justify-between gap-1">
                         <button
-                            onClick={() => {
-                                setShowInactive(prev => !prev);
-                                setPage(1);
-                            }}
-                            className='mt-2 p-3 font-semibold text-blue-500 hover:bg-slate-50 hover:text-black rounded-2xl cursor-pointer'
-                        >
-                            {showInactive ? 'Hide Inactive' : 'Show Inactive'}
-                        </button>
-                        <button
                             onClick={() => setShowAddForm(prev => !prev)}
                             className='mt-2 p-3 font-semibold text-blue-500 hover:bg-slate-50 hover:text-black rounded-2xl cursor-pointer'
                         >
                             Add New Item
+                        </button>
+                        <button
+                            onClick={() => router.push(`/storekeeper/orders?name=${encodeURIComponent(params.get('name') || '')}&email=${encodeURIComponent(storekeeperEmail)}`)}
+                            className='mt-2 p-3 font-semibold text-blue-500 hover:bg-slate-50 hover:text-black rounded-2xl cursor-pointer'
+                        >
+                            Orders
+                        </button>
+                        <button
+                            onClick={() => router.push(`/storekeeper/create-account?name=${encodeURIComponent(params.get('name') || '')}&email=${encodeURIComponent(storekeeperEmail)}`)}
+                            className='mt-2 p-3 font-semibold text-blue-500 hover:bg-slate-50 hover:text-black rounded-2xl cursor-pointer'
+                        >
+                            Create Storekeeper
                         </button>
                         <button
                             onClick={() => router.push('/storekeeper/item-requests')}
@@ -540,7 +543,17 @@ function DashboardInner() {
                             Clear filters
                         </button>
                     </div>
-                    <div className="md:col-span-12 flex justify-end">
+                    <div className="md:col-span-12 flex justify-end gap-2">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setShowInactive(prev => !prev);
+                                setPage(1);
+                            }}
+                            className="px-5 py-2 bg-slate-100 text-slate-700 font-semibold rounded-lg hover:bg-slate-200 transition"
+                        >
+                            {showInactive ? 'Hide Inactive' : 'Show Inactive'}
+                        </button>
                         <button type="submit" className="px-5 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition">
                             Apply Search
                         </button>
