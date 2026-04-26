@@ -9,7 +9,7 @@ ALTER TABLE `OrderItem`
 -- UpdateCart: only the three known cart actions are valid
 ALTER TABLE `UpdateCart`
   ADD CONSTRAINT `chk_updatecart_action`
-    CHECK (`Action` IN ('Add', 'Remove', 'SetQuantity'));
+    CHECK (`Action` IN ('Add', 'Remove', 'SetQuantity', 'Clear'));
 
 -- UpdateInventory: only the three known inventory actions are valid
 ALTER TABLE `UpdateInventory`

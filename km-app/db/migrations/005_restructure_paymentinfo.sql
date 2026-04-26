@@ -5,25 +5,24 @@
 --
 -- Legacy rows: last-4 and expiry are preserved; token set to a placeholder.
 -- These legacy tokens are invalid for charging — accounts need to re-add a card.
+-- We took out PaymentInfoToken because we're not actually running payment info via stripe for this project, so its an unecessary field.
+
 
 -- Step 1: add nullable new columns alongside the old ones
 ALTER TABLE `PaymentInfo`
-  ADD COLUMN `PaymentMethodToken` varchar(255) NULL AFTER `Provider`,
-  ADD COLUMN `Last4`              char(4)      NULL AFTER `PaymentMethodToken`,
+  ADD COLUMN `Last4`              char(4)      NULL AFTER `Provider`,
   ADD COLUMN `ExpMonth`           tinyint      NULL AFTER `Last4`,
   ADD COLUMN `ExpYear`            smallint     NULL AFTER `ExpMonth`;
 
 -- Step 2: backfill from legacy data (last 4 of card number, expiry month/year)
 UPDATE `PaymentInfo`
 SET
-  `PaymentMethodToken` = CONCAT('legacy_tok_', `ID`),
   `Last4`              = RIGHT(`Number`, 4),
   `ExpMonth`           = MONTH(`Exp_Date`),
   `ExpYear`            = YEAR(`Exp_Date`);
 
 -- Step 3: enforce NOT NULL now that all rows are populated
 ALTER TABLE `PaymentInfo`
-  MODIFY `PaymentMethodToken` varchar(255) NOT NULL,
   MODIFY `Last4`              char(4)      NOT NULL,
   MODIFY `ExpMonth`           tinyint      NOT NULL,
   MODIFY `ExpYear`            smallint     NOT NULL;
@@ -40,7 +39,7 @@ ALTER TABLE `PaymentInfo`
 -- Step 5: add validation constraints on the surviving columns
 ALTER TABLE `PaymentInfo`
   ADD CONSTRAINT `chk_payment_type`
-    CHECK (`Type` IN ('credit', 'debit', 'prepaid')),
+    CHECK (`Type` IN ('credit', 'debit')),
   ADD CONSTRAINT `chk_payment_exp_month`
     CHECK (`ExpMonth` BETWEEN 1 AND 12),
   ADD CONSTRAINT `chk_payment_exp_year`

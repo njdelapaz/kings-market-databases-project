@@ -82,6 +82,13 @@ ALTER TABLE `PaymentInfo`
   ADD PRIMARY KEY (`CustomerEmail`, `ID`),
   ADD UNIQUE KEY `uq_paymentinfo_id` (`ID`);
 
+-- Added statement to make ID auto increment
+ALTER TABLE `PaymentInfo `
+  MODIFY COLUMN `ID` INT(11) NOT NULL AUTO_INCREMENT
+
+-- Added statement to make CustomerEmail unique key, so payment info edits work properly.
+ALTER TABLE `PaymentInfo` ADD UNIQUE KEY `unique_customer` (`CustomerEmail`);
+
 ALTER TABLE `PaymentInfo`
   ADD CONSTRAINT `fk_paymentinfo_customer`
     FOREIGN KEY (`CustomerEmail`) REFERENCES `Customer_R1` (`Email`) ON DELETE CASCADE;
