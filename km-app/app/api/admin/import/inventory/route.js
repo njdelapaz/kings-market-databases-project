@@ -94,6 +94,11 @@ export async function POST(request) {
   let operationId = null;
 
   try {
+    const storekeeperEmail = request.headers.get('x-user-email');
+    if (!storekeeperEmail) {
+      return NextResponse.json({ success: false, message: 'Unauthorized.' }, { status: 401 });
+    }
+
     const body = await request.json();
     const format = String(body?.format || '').toLowerCase();
     const content = body?.content;

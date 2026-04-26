@@ -26,16 +26,19 @@ export async function POST(request){
             );
         }
 
-        const res = NextResponse.json({ success: true, orderId });
+        const now = new Date();
+        await Promise.all(
+            cartItems.flatMap((item) =>
+                Array.from({ length: item.TotalQuantity }, () =>
+                    db.query(
+                        `INSERT INTO UpdateCart (CustomerEmail, ItemID, Action) VALUES (?, ?, 'Remove')`,
+                        [customerEmail, item.ItemID, now]
+                    )
+                )
+            )
+        );
 
-        for(const item of cartItems){
-            await db.query(
-                `INSERT INTO UpdateCart (CustomerEmail, ItemID, Action) VALUES (?, ?, 'Clear')`,
-                [customerEmail, item.ItemID]
-            );
-        }
-
-        return res;
+        return NextResponse.json({ success: true, orderId });
     } catch(err){
         console.error('Checkout error:', err);
         return NextResponse.json({ success: false, error: 'Internal server error.' }, { status: 500 });

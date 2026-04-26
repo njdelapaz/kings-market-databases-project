@@ -1,7 +1,8 @@
 'use client'
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import dayjs from 'dayjs';
+import { error } from 'console';
 
 type CartItem = {
     ItemID: number;
@@ -22,8 +23,15 @@ type PaymentInfo = {
 export default function Cart(){
     const [cart, setCart] = useState<Record<string, CartItem>>({});
     const router = useRouter();
+    
     const [paymentInfo, setPaymentInfo] = useState<PaymentInfo[] | null>(null);
     const [paymentLoading, setPaymentLoading] = useState(true);
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [paymentErrors, setPaymentErrors] = useState<Record<string, string>>({});
+    const [errorState, setErrorState] = useState("");
+    const [itemErrors, setItemErrors] = useState<Record<string, string>>({});
+    const [updating, setUpdating] = useState<Record<string, boolean>>({});
+    const inFlight = useRef<Set<number>>(new Set());
 
     useEffect(() => {
         async function fetchPaymentInfo(){
@@ -60,6 +68,66 @@ export default function Cart(){
         fetchPaymentInfo();
     }, []);
 
+    async function refetchCart() {
+        const res = await fetch('/api/cart');
+        const data = await res.json();
+        if (data.success) {
+            const cartMap = (data.cart ?? []).reduce((acc: Record<string, CartItem>, item: CartItem) => {
+                acc[item.ItemID] = item;
+                return acc;
+            }, {});
+            setCart(cartMap);
+        }
+    }
+
+    async function adjustQuantity(itemID: number, action: 'Add' | 'Remove'){
+        if (!cart[itemID] || inFlight.current.has(itemID)) return;
+
+        inFlight.current.add(itemID);
+        setItemErrors(prev => { const next = { ...prev }; delete next[itemID]; return next; });
+        setUpdating(prev => ({ ...prev, [itemID]: true }));
+
+        try {
+            const res = await fetch('/api/cart', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ itemID, action }),
+            });
+            if (!res.ok) {
+                const data = await res.json();
+                setItemErrors(prev => ({ ...prev, [itemID]: data.error ?? 'Could not update cart.' }));
+            }
+        } catch(err) {
+            console.error(err);
+        } finally {
+            await refetchCart();
+            inFlight.current.delete(itemID);
+            setUpdating(prev => { const next = { ...prev }; delete next[itemID]; return next; });
+        }
+    }
+
+    async function removeItem(itemID: number){
+        setCart(prev => { const next = { ...prev }; delete next[itemID]; return next; });
+        try {
+            await fetch(`/api/cart?itemID=${itemID}`, { method: 'DELETE' });
+        } catch(err) {
+            console.error(err);
+            await refetchCart();
+        }
+    }
+
+    async function clearCart(){
+        try{
+            const res = await fetch('/api/cart', { method: 'DELETE' });
+            const data = await res.json();
+            if(data.success){
+                setCart({});
+            }
+        } catch(err){
+            console.error(err);
+        }
+    }
+
     async function checkout(){
         try{
             const res = await fetch('/api/checkout', {
@@ -74,6 +142,79 @@ export default function Cart(){
             }
         } catch(err){
             console.error(err);
+        }
+    }
+
+    async function validate(){
+        // validate payment form fields.
+        const errors: Record<string, string> = {}; //fix that tells typescript that errors is a hashmap with (key, value) pairs that are both strings.
+        const type = (document.getElementById("Type") as HTMLInputElement)?.value.trim();
+        const provider = (document.getElementById("Provider") as HTMLInputElement)?.value.trim();
+        const last4Digits = (document.getElementById("Last4") as HTMLInputElement)?.value.trim();
+        const expMonth = (document.getElementById("ExpMonth") as HTMLInputElement)?.value.trim();
+        const expYear = (document.getElementById("ExpYear") as HTMLInputElement)?.value.trim();
+
+        if(type != "credit" && type != "debit"){
+            errors.Type = "Card Type must be credit or debit (lowercase)."; //same as writing errors["Type"] - the .Type references a key in errors hashmap named "Type".
+            console.log("Card Type must be credit or debit (lowercase).");
+        }
+        if(!provider){
+            errors.Provider = "Provider required!"; // = errors["Provider"]
+            console.log("Provider required!");
+        }
+        if(!/^\d{4}$/.test(last4Digits)){
+            errors.Last4 = "Invalid card number!"; //same as example above.
+            console.log("Invalid card number!");
+        }
+        if(!/^([1-9]|1[0-2])$/.test(expMonth)){
+            errors.ExpMonth = "Invalid Month!";
+            console.log("Invalid Month!");
+        }
+        if(!/^\d{4}$/.test(expYear) || Number(expYear) < new Date().getFullYear()){
+            errors.ExpYear = "Invalid Year Value!";
+            console.log("Invalid Year Value!");
+        }
+        setPaymentErrors(errors);
+        console.log(Object.values(errors).length);
+        return Object.values(errors).length !== 0 // if length is > 0, then we have error!
+
+    }
+
+    // function to save payment info from form data.
+    async function savePaymentInfo(){
+        // only proceed if fields are valid. otherwise return error.
+        // await the results of validate, since its an async method.
+        const validationResults = await validate();
+        if(!validationResults){
+            console.log("within the function!!!");
+            // take form data.
+            const paymentData = {
+                type: (document.getElementById("Type") as HTMLInputElement)?.value.trim(),
+                provider: (document.getElementById("Provider") as HTMLInputElement)?.value.trim(),
+                last4: (document.getElementById("Last4") as HTMLInputElement)?.value.trim(),
+                expMonth: (document.getElementById("ExpMonth") as HTMLInputElement)?.value.trim(),
+                expYear: (document.getElementById("ExpYear") as HTMLInputElement)?.value.trim(),
+            }
+
+            const res = await fetch('api/paymentInfo', {
+                method: "PUT",
+                headers: {"Content-Type":"application/json"},
+                body: JSON.stringify(paymentData)
+            })
+
+            const data = await res.json();
+            if(data.success){
+                console.log("Payment Info Processed!");
+                setShowPaymentModal(false);
+                location.reload();
+            }
+            else{
+                setErrorState(data.error)
+            }
+        }
+        else{
+            console.log("Error with validate method!");
+            // don't reset paymentErrors here! Otherwise you lose the value!
         }
     }
 
@@ -99,7 +240,20 @@ export default function Cart(){
                     Back to Dashboard
                 </button>
 
-                <h1 className="text-4xl font-extrabold text-white mb-8 tracking-tight">Your Cart</h1>
+                <div className="flex items-center justify-between mb-8">
+                    <h1 className="text-4xl font-extrabold text-white tracking-tight">Your Cart</h1>
+                    {Object.values(cart).length > 0 && (
+                        <button
+                            onClick={clearCart}
+                            className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                            </svg>
+                            Clear Cart
+                        </button>
+                    )}
+                </div>
 
                 <div className="flex flex-col lg:flex-row gap-8 items-start">
 
@@ -110,16 +264,46 @@ export default function Cart(){
                         <div className="bg-white/95 backdrop-blur-sm rounded-3xl shadow-2xl overflow-hidden border border-indigo-400/20">
                             <div className="divide-y divide-slate-100">
                                 {Object.values(cart).map((item) => (
-                                    <div key={item.ItemID} className="p-6 flex justify-between items-center hover:bg-slate-50 transition-colors">
-                                        <div>
+                                    <div key={item.ItemID} className="p-6 flex justify-between items-center hover:bg-slate-50 transition-colors gap-4">
+                                        <div className="flex-1 min-w-0">
                                             <h2 className="text-xl font-bold text-slate-900">{item.Name}</h2>
-                                            <p className="text-slate-500 font-medium">
-                                                ${Number(item.Price).toFixed(2)} <span className="text-slate-300 mx-2">|</span> Qty: {item.TotalQuantity}
-                                            </p>
+                                            <p className="text-slate-500 font-medium">${Number(item.Price).toFixed(2)} each</p>
+                                            {itemErrors[item.ItemID] && (
+                                                <p className="text-red-500 text-sm font-medium mt-1">{itemErrors[item.ItemID]}</p>
+                                            )}
                                         </div>
-                                        <p className="text-xl font-black text-indigo-600">
+
+                                        {/* Quantity controls */}
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={() => adjustQuantity(item.ItemID, 'Remove')}
+                                                disabled={!!updating[item.ItemID]}
+                                                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-lg flex items-center justify-center transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                            >−</button>
+                                            <span className="w-6 text-center font-bold text-slate-900">
+                                                {updating[item.ItemID] ? '…' : item.TotalQuantity}
+                                            </span>
+                                            <button
+                                                onClick={() => adjustQuantity(item.ItemID, 'Add')}
+                                                disabled={!!updating[item.ItemID]}
+                                                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-lg flex items-center justify-center transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                            >+</button>
+                                        </div>
+
+                                        <p className="text-xl font-black text-indigo-600 w-20 text-right">
                                             ${(item.Price * item.TotalQuantity).toFixed(2)}
                                         </p>
+
+                                        {/* Remove item */}
+                                        <button
+                                            onClick={() => removeItem(item.ItemID)}
+                                            className="text-slate-300 hover:text-red-400 transition-colors ml-1"
+                                            title="Remove item"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                                            </svg>
+                                        </button>
                                     </div>
                                 ))}
 
@@ -177,7 +361,7 @@ export default function Cart(){
                                     ))}
                                     <div className="col-span-2 pt-2">
                                         <button
-                                            onClick={() => router.push("/account/payment")}
+                                            onClick={() => setShowPaymentModal(true)}
                                             className="text-indigo-600 text-sm font-semibold hover:text-indigo-800 transition-colors"
                                         >
                                             Edit payment info →
@@ -188,7 +372,7 @@ export default function Cart(){
                                 <div className="text-center py-6">
                                     <p className="text-slate-500 mb-4">No payment method saved.</p>
                                     <button
-                                        onClick={() => router.push("/account/payment")}
+                                        onClick={() => setShowPaymentModal(true)}
                                         className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-semibold text-sm hover:bg-indigo-700 transition-colors"
                                     >
                                         Add Payment Method
@@ -235,6 +419,73 @@ export default function Cart(){
                     </div>
 
                 </div>
+
+
+                {/** payment modal info */}
+                {showPaymentModal && (
+                    <div 
+                        className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+                        onClick={() => setShowPaymentModal(false)}
+                    >
+                        <div 
+                            className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-lg"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            {errorState && (
+                                <p className="text-sm text-red-400 font-medium text-center mb-2">{errorState}</p>
+                            )}
+                            {Object.keys(paymentErrors).length > 0 && (
+                                <div className='mb-4'>
+                                    Submission errors:
+                                    {Object.values(paymentErrors).map((err, idx) => (
+                                        <p key={idx} className="text-sm text-red-400 font-medium">- {err}</p>
+                                    ))}
+                                </div>
+                            )}
+                            <div className="flex items-center justify-between mb-6">
+                                <h2 className="text-xl font-bold text-slate-900">Add Payment Info</h2>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-1">Card Type</p>
+                                    <input id="Type" placeholder="credit / debit" className="w-full bg-slate-50 rounded-xl px-4 py-2.5 text-slate-800 text-sm border border-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-300" defaultValue={payment?.Type}/>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-1">Provider</p>
+                                    <input id="Provider" placeholder="Visa, Mastercard..." className="w-full bg-slate-50 rounded-xl px-4 py-2.5 text-slate-800 text-sm border border-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-300" defaultValue={payment?.Provider}/>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-1">Card Number (Last 4 Digits)</p>
+                                    <input id="Last4" placeholder="1234" maxLength={4} className="w-full bg-slate-50 rounded-xl px-4 py-2.5 text-slate-800 text-sm border border-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-300" defaultValue={payment?.Last4}/>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-1">Expiration Month (1 - 12)</p>
+                                    <input id="ExpMonth" placeholder="MM" maxLength={2} className="w-full bg-slate-50 rounded-xl px-4 py-2.5 text-slate-800 text-sm border border-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-300" defaultValue={payment?.ExpMonth}/>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-1">Expiration Year</p>
+                                    <input id="ExpYear" placeholder="YYYY" maxLength={4} className="w-full bg-slate-50 rounded-xl px-4 py-2.5 text-slate-800 text-sm border border-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-300" defaultValue={payment?.ExpYear}/>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-3 mt-6">
+                                <button
+                                    onClick={() => savePaymentInfo()}
+                                    className="flex-1 bg-indigo-600 text-white py-3 rounded-2xl font-bold text-sm hover:bg-indigo-700 transition-colors"
+                                >
+                                    Save
+                                </button>
+                                <button
+                                    onClick={() => setShowPaymentModal(false)}
+                                    className="px-6 py-3 rounded-2xl font-bold text-sm text-slate-500 border border-slate-200 hover:bg-slate-50 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

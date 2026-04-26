@@ -34,3 +34,5 @@ for macOS: `./cloud-sql-proxy kings-market-491600:us-east4:kings-market-db --por
 for linux: `idk man good luck`
 
 this will have the proxy running in that terminal, which is good, and you should be able to access the database now
+
+live GCP link: https://kings-market-app-1078601567030.us-east4.run.app/

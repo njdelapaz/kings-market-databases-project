@@ -1,6 +1,6 @@
 'use client';
 
-import { useSearchParams, useRouter, useParams } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState, Suspense } from 'react';
 import Link from 'next/link';
 import dayjs from 'dayjs';
@@ -42,16 +42,14 @@ function StockBadge({ status, quantity }: { status: StockStatus; quantity: numbe
 
 function ItemDetailInner() {
     const routeParams  = useParams<{ id: string }>();
-    const params       = useSearchParams();
     const router       = useRouter();
 
-    const id    = routeParams?.id ?? '';
-    const email = params.get('email') ?? '';
-    const name  = params.get('name')  ?? '';
+    const id = routeParams?.id ?? '';
 
-    const [item,      setItem]      = useState<Item | null>(null);
-    const [loading,   setLoading]   = useState(true);
-    const [errorMsg,  setErrorMsg]  = useState('');
+    const [item,       setItem]       = useState<Item | null>(null);
+    const [loading,    setLoading]    = useState(true);
+    const [errorMsg,   setErrorMsg]   = useState('');
+    const [loggedIn,   setLoggedIn]   = useState(false);
     const [submitting,setSubmitting]= useState(false);
     const [successMsg,setSuccessMsg]= useState('');
 
@@ -83,6 +81,13 @@ function ItemDetailInner() {
         return () => { cancelled = true; };
     }, [id]);
 
+    useEffect(() => {
+        fetch('/api/profile')
+            .then(r => r.ok ? r.json() : null)
+            .then(data => { if (data?.success) setLoggedIn(true); })
+            .catch(() => {});
+    }, []);
+
     async function addToCart() {
         if (!item || item.stockStatus === 'out_of_stock') return;
         setSubmitting(true);
@@ -93,10 +98,9 @@ function ItemDetailInner() {
             // here — click again for more. Batching into a loop here collides
             // on UpdateCart's (email, item, timestamp) PK at same-second precision.
             const info = {
-                itemID:        item.ItemID,
-                CustomerEmail: email,
-                action:        'Add',
-                timestamp:     dayjs().format('YYYY-MM-DD HH:mm:ss'),
+                itemID:    item.ItemID,
+                action:    'Add',
+                timestamp: dayjs().format('YYYY-MM-DD HH:mm:ss'),
             };
             const res  = await fetch('/api/cart', {
                 method:  'POST',
@@ -119,24 +123,19 @@ function ItemDetailInner() {
         }
     }
 
-    const backHref = `/customer?${new URLSearchParams({
-        ...(name  ? { name }  : {}),
-        ...(email ? { email } : {}),
-    }).toString()}`;
-
     return (
         <div className="min-h-screen bg-indigo-600 p-4 md:p-8">
             <div className="max-w-4xl mx-auto">
                 <div className="mb-6 flex items-center justify-between">
                     <Link
-                        href={backHref}
+                        href="/customer"
                         className="text-white/90 hover:text-white text-sm font-semibold"
                     >
                         ← Back to catalog
                     </Link>
-                    {email && (
+                    {loggedIn && (
                         <Link
-                            href={`/cart?email=${encodeURIComponent(email)}`}
+                            href="/cart"
                             className="text-white/90 hover:text-white text-sm font-semibold"
                         >
                             View cart →
@@ -178,9 +177,9 @@ function ItemDetailInner() {
                             <div className="mt-8 flex items-center gap-3">
                                 <button
                                     onClick={addToCart}
-                                    disabled={submitting || item.stockStatus === 'out_of_stock' || !email}
+                                    disabled={submitting || item.stockStatus === 'out_of_stock' || !loggedIn}
                                     className={`px-5 py-2 font-semibold rounded-lg transition ${
-                                        item.stockStatus === 'out_of_stock' || !email
+                                        item.stockStatus === 'out_of_stock' || !loggedIn
                                             ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
                                             : 'bg-blue-600 text-white hover:bg-blue-700'
                                     }`}
@@ -194,7 +193,7 @@ function ItemDetailInner() {
                                 </span>
                             </div>
 
-                            {!email && (
+                            {!loggedIn && (
                                 <p className="text-xs text-slate-500 mt-3">
                                     Log in as a customer to add items to a cart.
                                 </p>

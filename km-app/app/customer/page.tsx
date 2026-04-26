@@ -86,13 +86,11 @@ function DashboardInner() {
     const [errorMsg,     setErrorMsg]     = useState('');
     const [alert,        setAlert]        = useState({ show: false, itemName: '' });
 
-    const name  = params.get('name')  ?? '';
-    const email = params.get('email') ?? '';
+    const [username, setUsername] = useState('');
 
     const totalPages = Math.max(1, Math.ceil(total / urlPageSize));
 
-    // Build the next URL while preserving cross-cutting params (name, email)
-    // the rest of the app relies on for auth context.
+    // Build the next URL while preserving filter/sort/page params.
     const buildUrl = useCallback(
         (overrides: Record<string, string | number | null | undefined>) => {
             const next = new URLSearchParams(params.toString());
@@ -192,16 +190,22 @@ function DashboardInner() {
         return () => { cancelled = true; };
     }, []);
 
+    useEffect(() => {
+        fetch('/api/profile')
+            .then(r => r.ok ? r.json() : null)
+            .then(data => { if (data?.success) setUsername(data.profile.Username); })
+            .catch(() => {});
+    }, []);
+
     async function handleCart(item: Item) {
         if (item.stockStatus === 'out_of_stock') return;
         try {
             // Stock is decremented at checkout (owned by Shrikar), so Add to Cart
             // only appends to the cart log here — no POST /api/items call.
             const info = {
-                itemID:        item.ItemID,
-                CustomerEmail: email,
-                action:        'Add',
-                timestamp:     dayjs().format('YYYY-MM-DD HH:mm:ss'),
+                itemID:    item.ItemID,
+                action:    'Add',
+                timestamp: dayjs().format('YYYY-MM-DD HH:mm:ss'),
             };
             const res  = await fetch('/api/cart', {
                 method:  'POST',
@@ -232,8 +236,8 @@ function DashboardInner() {
         router.push('/login');
     };
 
-    const viewCart       = () => router.push(`/cart?email=${email}`);
-    const viewPastOrders = () => router.push(`/orderView?email=${email}`);
+    const viewCart       = () => router.push('/cart');
+    const viewPastOrders = () => router.push('/orderView');
 
     const sortValue = `${urlSort}:${urlOrder}`;
 
@@ -315,7 +319,7 @@ function DashboardInner() {
                 {/* Header */}
                 <div className="bg-white rounded-2xl shadow-sm p-8 border border-slate-200 mb-6 flex justify-between">
                     <h1 className="mt-2 p-3 text-slate-600">
-                        Hey <span className="font-semibold text-blue-600">{name}</span>!
+                        Hey <span className="font-semibold text-blue-600">{username || '...'}</span>!
                     </h1>
                     <div className="flex justify-between gap-1">
                         <button onClick={viewCart} className="mt-2 p-3 font-semibold text-indigo-600 hover:text-black hover:bg-slate-50 rounded-2xl cursor-pointer">
@@ -324,9 +328,12 @@ function DashboardInner() {
                         <button onClick={viewPastOrders} className="mt-2 p-3 font-semibold text-indigo-600 hover:text-black hover:bg-slate-50 rounded-2xl cursor-pointer">
                             Past Orders
                         </button>
-                        <h1 className="mt-2 p-3 font-semibold text-indigo-600 hover:text-black hover:bg-slate-50 rounded-2xl cursor-pointer">
+                        <button onClick={() => router.push('/profile')} className="mt-2 p-3 font-semibold text-indigo-600 hover:text-black hover:bg-slate-50 rounded-2xl cursor-pointer">
+                            Profile
+                        </button>
+                        <button onClick={() => router.push('/itemRequest')} className="mt-2 p-3 font-semibold text-indigo-600 hover:text-black hover:bg-slate-50 rounded-2xl cursor-pointer">
                             Item Requests
-                        </h1>
+                        </button>
                         <button
                             onClick={logout}
                             className="mt-2 p-2 text-sm font-semibold border-transparent text-slate-600 rounded-lg hover:bg-slate-50 hover:text-red-600 hover:border-red-200 transition-all flex items-center gap-2"
@@ -423,7 +430,7 @@ function DashboardInner() {
                                 <div className="p-5 flex-grow">
                                     <div className="flex justify-between items-start mb-2 gap-3">
                                         <Link
-                                            href={`/items/${item.ItemID}?email=${encodeURIComponent(email)}&name=${encodeURIComponent(name)}`}
+                                            href={`/items/${item.ItemID}`}
                                             className="text-lg font-bold text-slate-900 leading-tight hover:text-blue-600 transition-colors"
                                         >
                                             {item.Name}

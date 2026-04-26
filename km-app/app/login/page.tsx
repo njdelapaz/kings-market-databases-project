@@ -29,8 +29,7 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (data.success) {
-        // Cookie is set by the server — redirect with name/email so existing pages can read them
-        router.push(`/${role}?name=${encodeURIComponent(username)}&email=${encodeURIComponent(email)}`);
+        router.push(`/${role}`);
       } else {
         setError(data.message || data.error || 'Login failed.');
       }
