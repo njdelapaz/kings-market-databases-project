@@ -222,7 +222,7 @@ export default function Cart(){
                 location.reload();
             }
             else{
-                setErrorState(data.error)
+                setErrorState(typeof data.error === 'string' ? data.error : 'Failed to save payment info. Please try again.')
             }
         }
         else{
@@ -427,6 +427,9 @@ export default function Cart(){
 
                             {!isPaymentReady && Object.values(cart).length > 0 && !paymentLoading && (
                                 <p className="text-center text-xs text-slate-400 mt-3">Add a payment method to continue</p>
+                            )}
+                            {errorState && (
+                                <p className="text-sm text-red-500 font-medium text-center mt-3">{errorState}</p>
                             )}
                         </div>
                     </div>

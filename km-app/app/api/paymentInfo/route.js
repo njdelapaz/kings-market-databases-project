@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import db from '@/lib/db'
 
+// Fetches all saved payment methods (ID, type, provider, last4, expiry) for the logged-in customer.
 export async function POST(request){
     const customerEmail = request.headers.get('x-user-email');
 
@@ -22,6 +23,7 @@ export async function POST(request){
     }
 }
 
+// Inserts a new payment method for the customer, or updates the existing one if a duplicate key conflict occurs.
 export async function PUT(request){
     try{
         const CustomerEmail = request.headers.get('x-user-email');

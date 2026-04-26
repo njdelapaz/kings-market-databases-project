@@ -3,6 +3,7 @@ import db from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import { signToken, COOKIE_NAME } from '@/lib/auth';
 
+// Validates uniqueness of email/username, hashes the password, inserts into Customer_R1 and Customer_R2 in a transaction, then issues a JWT cookie.
 export async function POST(request) {
   const { username, email, phone, password } = await request.json();
 

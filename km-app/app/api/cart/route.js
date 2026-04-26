@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import db from '@/lib/db'
 
+// Returns the current cart by replaying Add/Remove events in UpdateCart and summing net quantity per item; only returns items with TotalQuantity > 0.
 export async function GET(request){
     const CustomerEmail = request.headers.get('x-user-email');
 
@@ -34,6 +35,7 @@ export async function GET(request){
     }
 }
 
+// Removes a specific item from the cart if itemID is provided, or clears the entire cart if not.
 export async function DELETE(request){
     const CustomerEmail = request.headers.get('x-user-email');
     const { searchParams } = new URL(request.url);
@@ -59,6 +61,7 @@ export async function DELETE(request){
     }
 }
 
+// Adds or removes items from the cart by inserting rows into UpdateCart; checks stock vs. existing cart quantity before allowing an Add.
 export async function POST(request){
     const CustomerEmail = request.headers.get('x-user-email');
     const { itemID, action, quantity = 1 } = await request.json();

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import db from '@/lib/db';
 
+// Extracts the numeric ItemID from a KM-XXXXXX SKU string; returns null if the format doesn't match.
 function parseItemIdFromSku(sku) {
   const match = /^KM-(\d+)$/.exec(String(sku || '').trim());
   if (!match) return null;
@@ -8,6 +9,7 @@ function parseItemIdFromSku(sku) {
   return Number.isInteger(itemId) && itemId > 0 ? itemId : null;
 }
 
+// Parses a CSV string into an array of objects keyed by lowercased header names.
 function parseCsv(content) {
   const lines = content
     .split('\n')
@@ -31,6 +33,7 @@ function parseCsv(content) {
   return rows;
 }
 
+// Converts the raw import content (JSON array or CSV string) into a uniform array of row objects.
 function normalizeRows(format, content) {
   if (format === 'json') {
     if (!Array.isArray(content)) return [];
@@ -41,6 +44,7 @@ function normalizeRows(format, content) {
   return parseCsv(content);
 }
 
+// Validates each row for required fields and valid numeric ranges; returns normalized rows and a list of per-row errors.
 function validateRows(rows) {
   const normalized = [];
   const errors = [];
@@ -70,6 +74,7 @@ function validateRows(rows) {
   return { normalized, errors };
 }
 
+// Inserts a pending AdminDataOperation record to track the import and returns the new OperationID.
 async function createOperation(connection, details) {
   const [result] = await connection.query(
     `INSERT INTO AdminDataOperation
@@ -80,6 +85,7 @@ async function createOperation(connection, details) {
   return result.insertId;
 }
 
+// Updates the AdminDataOperation record to success or failed with a completion timestamp and final notes.
 async function finalizeOperation(connection, operationId, status, notes) {
   await connection.query(
     `UPDATE AdminDataOperation
@@ -89,6 +95,7 @@ async function finalizeOperation(connection, operationId, status, notes) {
   );
 }
 
+// Parses and validates a CSV or JSON inventory file, then upserts each row into Item_R2 and Item_R1 inside a transaction, recording the operation in AdminDataOperation.
 export async function POST(request) {
   let connection;
   let operationId = null;

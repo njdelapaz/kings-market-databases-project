@@ -14,6 +14,8 @@ type OrderItem = {
 type Order = {
     OrderID: number;
     Timestamp: string;
+    Status: 'pending' | 'processing' | 'ready_for_pickup' | 'picked_up' | 'cancelled';
+    CancelReason?: string | null;
     ItemCount: number;
     TotalUnits: number;
     OrderTotal: number;
@@ -21,6 +23,22 @@ type Order = {
 };
 
 const PAGE_SIZE = 10;
+
+const STATUS_LABELS: Record<Order['Status'], string> = {
+    pending: 'Pending',
+    processing: 'Processing',
+    ready_for_pickup: 'Ready for Pickup',
+    picked_up: 'Picked Up',
+    cancelled: 'Cancelled',
+};
+
+function statusBadgeClass(status: Order['Status']) {
+    if (status === 'cancelled') return 'bg-red-100 text-red-700';
+    if (status === 'ready_for_pickup') return 'bg-emerald-100 text-emerald-700';
+    if (status === 'picked_up') return 'bg-slate-200 text-slate-700';
+    if (status === 'processing') return 'bg-amber-100 text-amber-700';
+    return 'bg-indigo-100 text-indigo-700';
+}
 
 export default function Orders(){
     const router = useRouter();
@@ -56,6 +74,13 @@ export default function Orders(){
     }, [router]);
 
     useEffect(() => { fetchOrders(1); }, [fetchOrders]);
+
+    useEffect(() => {
+        const timer = setInterval(() => {
+            fetchOrders(page);
+        }, 10000);
+        return () => clearInterval(timer);
+    }, [fetchOrders, page]);
 
     return (
         <div className="min-h-screen bg-indigo-600 p-4 md:p-12">
@@ -127,6 +152,9 @@ export default function Orders(){
                                             <p className="text-sm text-slate-500">{dayjs(ord.Timestamp).format('MM/DD/YYYY')}</p>
                                         </div>
                                         <div className="flex items-center gap-4">
+                                            <span className={`text-xs font-bold px-3 py-1 rounded-full ${statusBadgeClass(ord.Status)}`}>
+                                                {STATUS_LABELS[ord.Status]}
+                                            </span>
                                             <span className="text-sm font-semibold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">
                                                 {ord.ItemCount} {ord.ItemCount === 1 ? 'item' : 'items'}
                                             </span>
@@ -148,6 +176,12 @@ export default function Orders(){
 
                                     {openOrd === ord.OrderID && (
                                         <div className="border-t border-slate-100 divide-y divide-slate-100">
+                                            {ord.Status === 'cancelled' && ord.CancelReason && (
+                                                <div className="px-6 py-4 bg-red-50 text-red-700">
+                                                    <p className="text-xs uppercase tracking-wide font-semibold">Cancellation reason</p>
+                                                    <p className="text-sm mt-1">{ord.CancelReason}</p>
+                                                </div>
+                                            )}
                                             {ord.Items.map((item) => (
                                                 <div key={item.ItemID} className="px-6 py-4 flex justify-between items-center hover:bg-slate-50 transition-colors">
                                                     <div>

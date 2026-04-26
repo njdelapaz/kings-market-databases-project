@@ -14,13 +14,22 @@ Database Systems class project for Kings Market: a pre-order and pickup workflow
 2. Import schema and seed data:
    - `mysql -u <username> -p hgr9ba_b < hgr9ba_b.sql`
 
+## Default Storekeeper Login
+
+Created by `km-app/db/migrations/013_seed_default_storekeeper.sql`.
+
+- Role: `storekeeper`
+- Email: `storekeeper1@gmail.com`
+- Username: `johnstorekeeper`
+- Password: `Password`
+
 ## Migrations Folder Note
 
 - Files in `migrations/` are kept as **documentation only** for the SQL optimization sprint.
 - Do not execute those files directly unless the team explicitly changes workflow.
 
-
 ## to run cloud proxy
+
 first download gcloud and login with `gcloud auth application-default login`
 this logs you into your google account and should let you access the gcloud stuff from your computer
 
@@ -35,4 +44,4 @@ for linux: `idk man good luck`
 
 this will have the proxy running in that terminal, which is good, and you should be able to access the database now
 
-live GCP link: https://kings-market-app-1078601567030.us-east4.run.app/
+live GCP link: <https://kings-market-app-1078601567030.us-east4.run.app/>

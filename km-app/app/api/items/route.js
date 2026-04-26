@@ -20,18 +20,21 @@ const SORT_ORDERS = new Set(['asc', 'desc']);
 const DEFAULT_PAGE_SIZE = 12;
 const MAX_PAGE_SIZE = 100;
 
+// Returns the value as a positive integer, or the fallback if missing/invalid.
 function parsePositiveInt(value, fallback) {
     if (value == null || value === '') return fallback;
     const n = Number(value);
     return Number.isInteger(n) && n > 0 ? n : fallback;
 }
 
+// Returns the value as a non-negative number, or null if missing/invalid.
 function parseNonNegativeNumber(value) {
     if (value == null || value === '') return null;
     const n = Number(value);
     return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
+// Returns a paginated, filtered, and sorted list of active (IsSelling=1) items for the customer catalog, with stockStatus derived from Quantity.
 export async function GET(request){
     try{
         const { searchParams } = new URL(request.url);
@@ -119,6 +122,7 @@ export async function GET(request){
     }
 }
 
+// Adjusts stock for a given item by a signed delta (positive=restock, negative=decrement) inside a transaction with a row-level lock; storekeeper only.
 export async function POST(request){
     // Only storekeepers may modify inventory
     const role = request.headers.get('x-user-role');
