@@ -126,6 +126,25 @@ function DashboardInner() {
         return () => { cancelled = true; };
     }, []);
 
+    useEffect(() => {
+        let cancelled = false;
+        async function loadItemRequests() {
+            try {
+                const res  = await fetch('/api/item-requests');
+                const data = await res.json();
+                if (!cancelled && data.success) {
+                    setItemRequests(data.requests ?? []);
+                }
+            } catch (err) {
+                console.error('Failed to fetch item requests:', err);
+            } finally {
+                if (!cancelled) setReqLoading(false);
+            }
+        }
+        loadItemRequests();
+        return () => { cancelled = true; };
+    }, []);
+
     const goToPage = (nextPage: number) => {
         const clamped = Math.min(Math.max(1, nextPage), totalPages);
         if (clamped !== page) setPage(clamped);
