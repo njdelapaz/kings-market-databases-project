@@ -147,7 +147,7 @@ export default function Cart(){
 
     async function validate(){
         // validate payment form fields.
-        const errors = {};
+        const errors: Record<string, string> = {}; //fix that tells typescript that errors is a hashmap with (key, value) pairs that are both strings.
         const type = (document.getElementById("Type") as HTMLInputElement)?.value.trim();
         const provider = (document.getElementById("Provider") as HTMLInputElement)?.value.trim();
         const last4Digits = (document.getElementById("Last4") as HTMLInputElement)?.value.trim();
@@ -155,15 +155,15 @@ export default function Cart(){
         const expYear = (document.getElementById("ExpYear") as HTMLInputElement)?.value.trim();
 
         if(type != "credit" && type != "debit"){
-            errors.Type = "Card Type must be credit or debit (lowercase).";
+            errors.Type = "Card Type must be credit or debit (lowercase)."; //same as writing errors["Type"] - the .Type references a key in errors hashmap named "Type".
             console.log("Card Type must be credit or debit (lowercase).");
         }
         if(!provider){
-            errors.Provider = "Provider required!";
+            errors.Provider = "Provider required!"; // = errors["Provider"]
             console.log("Provider required!");
         }
         if(!/^\d{4}$/.test(last4Digits)){
-            errors.Last4 = "Invalid card number!";
+            errors.Last4 = "Invalid card number!"; //same as example above.
             console.log("Invalid card number!");
         }
         if(!/^([1-9]|1[0-2])$/.test(expMonth)){
