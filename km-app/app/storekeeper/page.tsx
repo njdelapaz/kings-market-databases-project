@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useState, Suspense } from 'react';
+import { useCallback, useEffect, useMemo, useState, Suspense } from 'react';
 
 type Item = {
     ItemID: number;
@@ -13,10 +13,31 @@ type Item = {
     Category: string | null;
 }
 
+type Category = { name: string; itemCount: number };
+type SortKey = 'name' | 'price' | 'quantity';
+type SortOrder = 'asc' | 'desc';
+
+const SORT_OPTIONS: { value: `${SortKey}:${SortOrder}`; label: string }[] = [
+    { value: 'name:asc',      label: 'Name (A-Z)' },
+    { value: 'name:desc',     label: 'Name (Z-A)' },
+    { value: 'price:asc',     label: 'Price (Low to High)' },
+    { value: 'price:desc',    label: 'Price (High to Low)' },
+    { value: 'quantity:desc', label: 'Stock (Most first)' },
+    { value: 'quantity:asc',  label: 'Stock (Least first)' },
+];
+
 function DashboardInner() {
     const [items, setItems] = useState<Item[]>([]);
-    const [visibleCount, setVisibleCount] = useState(12);
+    const [total, setTotal] = useState(0);
+    const [page, setPage] = useState(1);
     const [search, setSearch] = useState('');
+    const [appliedSearch, setAppliedSearch] = useState('');
+    const [categories, setCategories] = useState<Category[]>([]);
+    const [categoryFilter, setCategoryFilter] = useState('');
+    const [minPriceFilter, setMinPriceFilter] = useState('');
+    const [maxPriceFilter, setMaxPriceFilter] = useState('');
+    const [sortKey, setSortKey] = useState<SortKey>('name');
+    const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
     const [showInactive, setShowInactive] = useState(true);
     const [showAddForm, setShowAddForm] = useState(false);
     const [editingItemId, setEditingItemId] = useState<number | null>(null);
@@ -40,20 +61,33 @@ function DashboardInner() {
     });
     const params = useSearchParams();
     const router = useRouter();
+    const pageSize = 12;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
-    async function getItems(query = search) {
+    const getItems = useCallback(async () => {
         try {
             setErrorMsg('');
-            const q = query.trim();
-            const url = `/api/admin/items?includeInactive=${showInactive ? 'true' : 'false'}${q ? `&search=${encodeURIComponent(q)}` : ''}`;
+            const q = appliedSearch.trim();
+            const qs = new URLSearchParams();
+            qs.set('includeInactive', showInactive ? 'true' : 'false');
+            if (q) qs.set('search', q);
+            if (categoryFilter) qs.set('category', categoryFilter);
+            if (minPriceFilter.trim()) qs.set('minPrice', minPriceFilter.trim());
+            if (maxPriceFilter.trim()) qs.set('maxPrice', maxPriceFilter.trim());
+            qs.set('sort', sortKey);
+            qs.set('order', sortOrder);
+            qs.set('page', String(page));
+            qs.set('pageSize', String(pageSize));
+
+            const url = `/api/admin/items?${qs.toString()}`;
             const res = await fetch(url, {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' },
             });
             const data = await res.json();
             if (data.success) {
-                setItems(data.items);
-                setVisibleCount(12);
+                setItems(data.items ?? []);
+                setTotal(Number(data.total) || 0);
             } else {
                 setErrorMsg(data.message || 'Failed to load items.');
             }
@@ -61,14 +95,41 @@ function DashboardInner() {
             console.error("Failed to fetch items:", error);
             setErrorMsg('Failed to fetch items.');
         }
-    }
+    }, [appliedSearch, categoryFilter, maxPriceFilter, minPriceFilter, page, pageSize, showInactive, sortKey, sortOrder]);
 
     useEffect(() => {
         getItems();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [showInactive]);
+    }, [getItems]);
 
-    const loadMore = () => setVisibleCount(prev => prev + 12);
+    useEffect(() => {
+        let cancelled = false;
+        async function loadCategories() {
+            try {
+                const res = await fetch('/api/categories');
+                const data = await res.json();
+                if (!cancelled && data.success) {
+                    setCategories(data.categories ?? []);
+                }
+            } catch (error) {
+                console.error('Failed to fetch categories:', error);
+            }
+        }
+        loadCategories();
+        return () => { cancelled = true; };
+    }, []);
+
+    const goToPage = (nextPage: number) => {
+        const clamped = Math.min(Math.max(1, nextPage), totalPages);
+        if (clamped !== page) setPage(clamped);
+    };
+
+    const pageWindow = useMemo(() => {
+        const window: number[] = [];
+        const start = Math.max(1, page - 2);
+        const end = Math.min(totalPages, start + 4);
+        for (let p = start; p <= end; p++) window.push(p);
+        return window;
+    }, [page, totalPages]);
 
     const logout = async () => {
         await fetch('/api/auth/logout', { method: 'POST' });
@@ -92,7 +153,8 @@ function DashboardInner() {
 
     const onSearchSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        await getItems(search);
+        setAppliedSearch(search.trim());
+        setPage(1);
     }
 
     const handleCreateItem = async (e: React.FormEvent) => {
@@ -208,7 +270,10 @@ function DashboardInner() {
                     </h1>
                     <div className="flex justify-between gap-1">
                         <button
-                            onClick={() => setShowInactive(prev => !prev)}
+                            onClick={() => {
+                                setShowInactive(prev => !prev);
+                                setPage(1);
+                            }}
                             className='mt-2 p-3 font-semibold text-blue-500 hover:bg-slate-50 hover:text-black rounded-2xl cursor-pointer'
                         >
                             {showInactive ? 'Hide Inactive' : 'Show Inactive'}
@@ -230,20 +295,91 @@ function DashboardInner() {
                     </div>
                 </div>
 
-                <form onSubmit={onSearchSubmit} className="bg-white rounded-2xl shadow-sm p-4 border border-slate-200 mb-6 flex gap-3">
+                <form onSubmit={onSearchSubmit} className="bg-white rounded-2xl shadow-sm p-4 border border-slate-200 mb-6 grid grid-cols-1 md:grid-cols-12 gap-3">
                     <input
                         type="text"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         placeholder="Search by item name or SKU"
-                        className="flex-grow px-4 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                        className="md:col-span-5 px-4 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-300 text-slate-900 placeholder-slate-400"
                     />
-                    <button type="submit" className="px-5 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition">
-                        Search
-                    </button>
-                    <button type="button" onClick={() => { setSearch(''); getItems(''); }} className="px-5 py-2 bg-slate-100 text-slate-700 font-semibold rounded-lg hover:bg-slate-200 transition">
-                        Clear
-                    </button>
+                    <select
+                        value={categoryFilter}
+                        onChange={(e) => {
+                            setCategoryFilter(e.target.value);
+                            setPage(1);
+                        }}
+                        className="md:col-span-3 px-4 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-300 text-slate-900"
+                    >
+                        <option value="">All categories</option>
+                        {categories.map(c => (
+                            <option key={c.name} value={c.name}>
+                                {c.name} ({c.itemCount})
+                            </option>
+                        ))}
+                    </select>
+                    <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={minPriceFilter}
+                        onChange={(e) => {
+                            setMinPriceFilter(e.target.value);
+                            setPage(1);
+                        }}
+                        placeholder="Min price"
+                        className="md:col-span-2 px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-300 text-slate-900 placeholder-slate-400"
+                    />
+                    <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={maxPriceFilter}
+                        onChange={(e) => {
+                            setMaxPriceFilter(e.target.value);
+                            setPage(1);
+                        }}
+                        placeholder="Max price"
+                        className="md:col-span-2 px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-300 text-slate-900 placeholder-slate-400"
+                    />
+                    <select
+                        value={`${sortKey}:${sortOrder}`}
+                        onChange={(e) => {
+                            const [nextSort, nextOrder] = e.target.value.split(':') as [SortKey, SortOrder];
+                            setSortKey(nextSort);
+                            setSortOrder(nextOrder);
+                            setPage(1);
+                        }}
+                        className="md:col-span-4 px-4 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-300 text-slate-900"
+                    >
+                        {SORT_OPTIONS.map(o => (
+                            <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                    </select>
+                    <div className="md:col-span-8 flex items-center justify-between text-sm text-slate-500">
+                        <span>{total} item{total === 1 ? '' : 's'} found</span>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setSearch('');
+                                setAppliedSearch('');
+                                setCategoryFilter('');
+                                setMinPriceFilter('');
+                                setMaxPriceFilter('');
+                                setSortKey('name');
+                                setSortOrder('asc');
+                                setPage(1);
+                            }}
+                            className="px-3 py-1 text-slate-600 hover:text-slate-900"
+                        >
+                            Clear filters
+                        </button>
+                    </div>
+                    <div className="md:col-span-12 flex justify-end">
+                        <button type="submit" className="px-5 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition">
+                            Apply Search
+                        </button>
+                    </div>
                 </form>
 
                 {showAddForm && (
@@ -279,7 +415,7 @@ function DashboardInner() {
 
                 {/* Items Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {items.slice(0, visibleCount).map((item) => (
+                    {items.map((item) => (
                         <div key={item.ItemID} className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col">
                             <div className="p-5 flex-grow">
                                 <div className="flex justify-between items-start mb-2">
@@ -333,10 +469,34 @@ function DashboardInner() {
                     ))}
                 </div>
 
-                {visibleCount < items.length && (
-                    <div className="mt-12 flex justify-center">
-                        <button onClick={loadMore} className="px-8 py-3 bg-white border border-slate-300 text-slate-700 font-semibold rounded-full hover:bg-slate-50 hover:border-slate-400 transition-all shadow-sm">
-                            Show More Items
+                {totalPages > 1 && (
+                    <div className="mt-10 flex justify-center items-center gap-2">
+                        <button
+                            onClick={() => goToPage(page - 1)}
+                            disabled={page <= 1}
+                            className="px-4 py-2 bg-white border border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-50 hover:border-slate-400 transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                            Previous
+                        </button>
+                        {pageWindow.map((p) => (
+                            <button
+                                key={p}
+                                onClick={() => goToPage(p)}
+                                className={`px-4 py-2 rounded-lg font-semibold transition-all shadow-sm border ${
+                                    p === page
+                                        ? 'bg-blue-600 text-white border-blue-600'
+                                        : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50 hover:border-slate-400'
+                                }`}
+                            >
+                                {p}
+                            </button>
+                        ))}
+                        <button
+                            onClick={() => goToPage(page + 1)}
+                            disabled={page >= totalPages}
+                            className="px-4 py-2 bg-white border border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-50 hover:border-slate-400 transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                            Next
                         </button>
                     </div>
                 )}
