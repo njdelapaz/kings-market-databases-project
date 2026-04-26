@@ -103,7 +103,15 @@ export async function POST(request) {
     const format = String(body?.format || '').toLowerCase();
     const content = body?.content;
     const sourceFilename = body?.filename ? String(body.filename).trim() : null;
+    const storekeeperEmail = String(body?.storekeeperEmail || request.headers.get('x-user-email') || '').trim();
+    const role = request.headers.get('x-user-role');
 
+    if (role && role !== 'storekeeper') {
+      return NextResponse.json({ success: false, message: 'Forbidden.' }, { status: 403 });
+    }
+    if (!storekeeperEmail) {
+      return NextResponse.json({ success: false, message: 'storekeeperEmail is required.' }, { status: 400 });
+    }
     if (!['csv', 'json'].includes(format)) {
       return NextResponse.json({ success: false, message: 'format must be csv or json.' }, { status: 400 });
     }
