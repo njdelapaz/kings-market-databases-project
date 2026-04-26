@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useState, Suspense } from 'react';
+import { useCallback, useEffect, useMemo, useState, Suspense } from 'react';
 
 type Item = {
     ItemID: number;
@@ -13,22 +13,50 @@ type Item = {
     Category: string | null;
 }
 
+type Category = { name: string; itemCount: number };
+type SortKey = 'name' | 'price' | 'quantity';
+type SortOrder = 'asc' | 'desc';
+
+const SORT_OPTIONS: { value: `${SortKey}:${SortOrder}`; label: string }[] = [
+    { value: 'name:asc',      label: 'Name (A-Z)' },
+    { value: 'name:desc',     label: 'Name (Z-A)' },
+    { value: 'price:asc',     label: 'Price (Low to High)' },
+    { value: 'price:desc',    label: 'Price (High to Low)' },
+    { value: 'quantity:desc', label: 'Stock (Most first)' },
+    { value: 'quantity:asc',  label: 'Stock (Least first)' },
+];
+
 function DashboardInner() {
     const [items, setItems] = useState<Item[]>([]);
-    const [visibleCount, setVisibleCount] = useState(12);
+    const [total, setTotal] = useState(0);
+    const [page, setPage] = useState(1);
     const [search, setSearch] = useState('');
+    const [appliedSearch, setAppliedSearch] = useState('');
+    const [categories, setCategories] = useState<Category[]>([]);
+    const [categoryFilter, setCategoryFilter] = useState('');
+    const [minPriceFilter, setMinPriceFilter] = useState('');
+    const [maxPriceFilter, setMaxPriceFilter] = useState('');
+    const [sortKey, setSortKey] = useState<SortKey>('name');
+    const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
     const [showInactive, setShowInactive] = useState(true);
     const [showAddForm, setShowAddForm] = useState(false);
     const [editingItemId, setEditingItemId] = useState<number | null>(null);
     const [statusMsg, setStatusMsg] = useState('');
     const [errorMsg, setErrorMsg] = useState('');
+    const [importMsg, setImportMsg] = useState('');
+    const [exportMsg, setExportMsg] = useState('');
+    const [importFormat, setImportFormat] = useState<'csv' | 'json'>('csv');
+    const [importFile, setImportFile] = useState<File | null>(null);
+    const [isImporting, setIsImporting] = useState(false);
+    const [isExporting, setIsExporting] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [itemRequests,  setItemRequests] = useState<{ ID: number; CustomerEmail: string; Name: string; Description: string | null }[]>([]);
+    const [reqLoading,    setReqLoading]   = useState(true);
     const [newItem, setNewItem] = useState({
-        sku: '',
         name: '',
         category: '',
-        quantity: '0',
-        price: '0',
+        quantity: '',
+        price: '',
         isSelling: true,
     });
     const [editItem, setEditItem] = useState({
@@ -40,20 +68,34 @@ function DashboardInner() {
     });
     const params = useSearchParams();
     const router = useRouter();
+    const storekeeperEmail = params.get('email') ?? '';
+    const pageSize = 12;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
-    async function getItems(query = search) {
+    const getItems = useCallback(async () => {
         try {
             setErrorMsg('');
-            const q = query.trim();
-            const url = `/api/admin/items?includeInactive=${showInactive ? 'true' : 'false'}${q ? `&search=${encodeURIComponent(q)}` : ''}`;
+            const q = appliedSearch.trim();
+            const qs = new URLSearchParams();
+            qs.set('includeInactive', showInactive ? 'true' : 'false');
+            if (q) qs.set('search', q);
+            if (categoryFilter) qs.set('category', categoryFilter);
+            if (minPriceFilter.trim()) qs.set('minPrice', minPriceFilter.trim());
+            if (maxPriceFilter.trim()) qs.set('maxPrice', maxPriceFilter.trim());
+            qs.set('sort', sortKey);
+            qs.set('order', sortOrder);
+            qs.set('page', String(page));
+            qs.set('pageSize', String(pageSize));
+
+            const url = `/api/admin/items?${qs.toString()}`;
             const res = await fetch(url, {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' },
             });
             const data = await res.json();
             if (data.success) {
-                setItems(data.items);
-                setVisibleCount(12);
+                setItems(data.items ?? []);
+                setTotal(Number(data.total) || 0);
             } else {
                 setErrorMsg(data.message || 'Failed to load items.');
             }
@@ -61,14 +103,41 @@ function DashboardInner() {
             console.error("Failed to fetch items:", error);
             setErrorMsg('Failed to fetch items.');
         }
-    }
+    }, [appliedSearch, categoryFilter, maxPriceFilter, minPriceFilter, page, pageSize, showInactive, sortKey, sortOrder]);
 
     useEffect(() => {
         getItems();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [showInactive]);
+    }, [getItems]);
 
-    const loadMore = () => setVisibleCount(prev => prev + 12);
+    useEffect(() => {
+        let cancelled = false;
+        async function loadCategories() {
+            try {
+                const res = await fetch('/api/categories');
+                const data = await res.json();
+                if (!cancelled && data.success) {
+                    setCategories(data.categories ?? []);
+                }
+            } catch (error) {
+                console.error('Failed to fetch categories:', error);
+            }
+        }
+        loadCategories();
+        return () => { cancelled = true; };
+    }, []);
+
+    const goToPage = (nextPage: number) => {
+        const clamped = Math.min(Math.max(1, nextPage), totalPages);
+        if (clamped !== page) setPage(clamped);
+    };
+
+    const pageWindow = useMemo(() => {
+        const window: number[] = [];
+        const start = Math.max(1, page - 2);
+        const end = Math.min(totalPages, start + 4);
+        for (let p = start; p <= end; p++) window.push(p);
+        return window;
+    }, [page, totalPages]);
 
     const logout = async () => {
         await fetch('/api/auth/logout', { method: 'POST' });
@@ -92,7 +161,8 @@ function DashboardInner() {
 
     const onSearchSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        await getItems(search);
+        setAppliedSearch(search.trim());
+        setPage(1);
     }
 
     const handleCreateItem = async (e: React.FormEvent) => {
@@ -105,7 +175,6 @@ function DashboardInner() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    sku: newItem.sku,
                     name: newItem.name,
                     category: newItem.category,
                     quantity: Number(newItem.quantity),
@@ -121,11 +190,10 @@ function DashboardInner() {
 
             setStatusMsg('Item added successfully.');
             setNewItem({
-                sku: '',
                 name: '',
                 category: '',
-                quantity: '0',
-                price: '0',
+                quantity: '',
+                price: '',
                 isSelling: true,
             });
             setShowAddForm(false);
@@ -171,32 +239,164 @@ function DashboardInner() {
         }
     }
 
-    const handleSoftDisable = async (itemId: number) => {
-        setStatusMsg('');
+    const handleImportInventory = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setImportMsg('');
         setErrorMsg('');
-        setIsSubmitting(true);
+
+        if (!importFile) {
+            setImportMsg('Choose a file to import.');
+            return;
+        }
+
+        const selectedFormat = importFormat;
+        if (selectedFormat === 'csv' && !importFile.name.toLowerCase().endsWith('.csv')) {
+            setImportMsg('Please choose a .csv file for CSV import.');
+            return;
+        }
+        if (selectedFormat === 'json' && !importFile.name.toLowerCase().endsWith('.json')) {
+            setImportMsg('Please choose a .json file for JSON import.');
+            return;
+        }
+
+        setIsImporting(true);
         try {
-            const res = await fetch(`/api/admin/items/${itemId}`, {
-                method: 'DELETE',
+            const text = await importFile.text();
+            const content = selectedFormat === 'json' ? JSON.parse(text) : text;
+
+            const res = await fetch('/api/admin/import/inventory', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    format: selectedFormat,
+                    content,
+                    filename: importFile.name,
+                    ...(storekeeperEmail ? { storekeeperEmail } : {}),
+                }),
             });
             const data = await res.json();
             if (!res.ok || !data.success) {
-                setErrorMsg(data.message || 'Failed to remove item from sale.');
+                setImportMsg(data.message || 'Import failed.');
                 return;
             }
 
-            setStatusMsg('Item removed from sale.');
-            if (editingItemId === itemId) {
-                setEditingItemId(null);
-            }
+            setImportMsg(`Import complete. Rows processed: ${data.rowsProcessed}.`);
+            setImportFile(null);
             await getItems();
         } catch (error) {
-            console.error(error);
-            setErrorMsg('Failed to remove item from sale.');
+            console.error('Import failed:', error);
+            setImportMsg('Import failed. Check file format and try again.');
         } finally {
-            setIsSubmitting(false);
+            setIsImporting(false);
         }
-    }
+    };
+
+    const handleExportInventory = async (format: 'csv' | 'json') => {
+        setExportMsg('');
+        setErrorMsg('');
+        setIsExporting(true);
+        try {
+            const qs = new URLSearchParams({
+                format,
+                includeInactive: showInactive ? 'true' : 'false',
+            });
+            if (storekeeperEmail) qs.set('storekeeperEmail', storekeeperEmail);
+
+            const res = await fetch(`/api/admin/export/inventory?${qs.toString()}`);
+            if (!res.ok) {
+                let message = 'Export failed.';
+                try {
+                    const err = await res.json();
+                    message = err.message || message;
+                } catch {
+                    // ignore json parse errors for non-json responses
+                }
+                setExportMsg(message);
+                return;
+            }
+
+            if (format === 'csv') {
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `inventory_export_${new Date().toISOString().slice(0, 10)}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+            } else {
+                const data = await res.json();
+                const blob = new Blob([JSON.stringify(data.data ?? [], null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = data.filename || `inventory_export_${new Date().toISOString().slice(0, 10)}.json`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+            }
+            setExportMsg(`Exported inventory as ${format.toUpperCase()}.`);
+        } catch (error) {
+            console.error('Export failed:', error);
+            setExportMsg('Export failed.');
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
+    const handleExportTransactions = async (format: 'csv' | 'json') => {
+        setExportMsg('');
+        setErrorMsg('');
+        setIsExporting(true);
+        try {
+            const qs = new URLSearchParams({ format });
+            if (storekeeperEmail) qs.set('storekeeperEmail', storekeeperEmail);
+
+            const res = await fetch(`/api/admin/export/transactions?${qs.toString()}`);
+            if (!res.ok) {
+                let message = 'Transaction export failed.';
+                try {
+                    const err = await res.json();
+                    message = err.message || message;
+                } catch {
+                    // ignore json parse errors for non-json responses
+                }
+                setExportMsg(message);
+                return;
+            }
+
+            if (format === 'csv') {
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `transactions_export_${new Date().toISOString().slice(0, 10)}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+            } else {
+                const data = await res.json();
+                const blob = new Blob([JSON.stringify(data.data ?? [], null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = data.filename || `transactions_export_${new Date().toISOString().slice(0, 10)}.json`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+            }
+            setExportMsg(`Exported transactions as ${format.toUpperCase()}.`);
+        } catch (error) {
+            console.error('Transaction export failed:', error);
+            setExportMsg('Transaction export failed.');
+        } finally {
+            setIsExporting(false);
+        }
+    };
 
     return (
         <div className="min-h-screen bg-indigo-600 p-4 md:p-8">
@@ -208,7 +408,10 @@ function DashboardInner() {
                     </h1>
                     <div className="flex justify-between gap-1">
                         <button
-                            onClick={() => setShowInactive(prev => !prev)}
+                            onClick={() => {
+                                setShowInactive(prev => !prev);
+                                setPage(1);
+                            }}
                             className='mt-2 p-3 font-semibold text-blue-500 hover:bg-slate-50 hover:text-black rounded-2xl cursor-pointer'
                         >
                             {showInactive ? 'Hide Inactive' : 'Show Inactive'}
@@ -218,6 +421,12 @@ function DashboardInner() {
                             className='mt-2 p-3 font-semibold text-blue-500 hover:bg-slate-50 hover:text-black rounded-2xl cursor-pointer'
                         >
                             Add New Item
+                        </button>
+                        <button
+                            onClick={() => router.push(`/storekeeper/reports?name=${encodeURIComponent(params.get('name') || '')}&email=${encodeURIComponent(storekeeperEmail)}`)}
+                            className='mt-2 p-3 font-semibold text-blue-500 hover:bg-slate-50 hover:text-black rounded-2xl cursor-pointer'
+                        >
+                            Reports
                         </button>
                         <button
                             onClick={logout}
@@ -230,27 +439,185 @@ function DashboardInner() {
                     </div>
                 </div>
 
-                <form onSubmit={onSearchSubmit} className="bg-white rounded-2xl shadow-sm p-4 border border-slate-200 mb-6 flex gap-3">
+                <form onSubmit={onSearchSubmit} className="bg-white rounded-2xl shadow-sm p-4 border border-slate-200 mb-6 grid grid-cols-1 md:grid-cols-12 gap-3">
                     <input
                         type="text"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         placeholder="Search by item name or SKU"
-                        className="flex-grow px-4 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                        className="md:col-span-5 px-4 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-300 text-slate-900 placeholder-slate-400"
                     />
-                    <button type="submit" className="px-5 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition">
-                        Search
-                    </button>
-                    <button type="button" onClick={() => { setSearch(''); getItems(''); }} className="px-5 py-2 bg-slate-100 text-slate-700 font-semibold rounded-lg hover:bg-slate-200 transition">
-                        Clear
-                    </button>
+                    <select
+                        value={categoryFilter}
+                        onChange={(e) => {
+                            setCategoryFilter(e.target.value);
+                            setPage(1);
+                        }}
+                        className="md:col-span-3 px-4 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-300 text-slate-900"
+                    >
+                        <option value="">All categories</option>
+                        {categories.map(c => (
+                            <option key={c.name} value={c.name}>
+                                {c.name} ({c.itemCount})
+                            </option>
+                        ))}
+                    </select>
+                    <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={minPriceFilter}
+                        onChange={(e) => {
+                            setMinPriceFilter(e.target.value);
+                            setPage(1);
+                        }}
+                        placeholder="Min price"
+                        className="md:col-span-2 px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-300 text-slate-900 placeholder-slate-400"
+                    />
+                    <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={maxPriceFilter}
+                        onChange={(e) => {
+                            setMaxPriceFilter(e.target.value);
+                            setPage(1);
+                        }}
+                        placeholder="Max price"
+                        className="md:col-span-2 px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-300 text-slate-900 placeholder-slate-400"
+                    />
+                    <select
+                        value={`${sortKey}:${sortOrder}`}
+                        onChange={(e) => {
+                            const [nextSort, nextOrder] = e.target.value.split(':') as [SortKey, SortOrder];
+                            setSortKey(nextSort);
+                            setSortOrder(nextOrder);
+                            setPage(1);
+                        }}
+                        className="md:col-span-4 px-4 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-300 text-slate-900"
+                    >
+                        {SORT_OPTIONS.map(o => (
+                            <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                    </select>
+                    <div className="md:col-span-8 flex items-center justify-between text-sm text-slate-500">
+                        <span>{total} item{total === 1 ? '' : 's'} found</span>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setSearch('');
+                                setAppliedSearch('');
+                                setCategoryFilter('');
+                                setMinPriceFilter('');
+                                setMaxPriceFilter('');
+                                setSortKey('name');
+                                setSortOrder('asc');
+                                setPage(1);
+                            }}
+                            className="px-3 py-1 text-slate-600 hover:text-slate-900"
+                        >
+                            Clear filters
+                        </button>
+                    </div>
+                    <div className="md:col-span-12 flex justify-end">
+                        <button type="submit" className="px-5 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition">
+                            Apply Search
+                        </button>
+                    </div>
                 </form>
+
+                <div className="bg-white rounded-2xl shadow-sm p-5 border border-slate-200 mb-6">
+                    <h2 className="text-lg font-semibold text-slate-800 mb-3">Import / Export Inventory</h2>
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                        <form onSubmit={handleImportInventory} className="border border-slate-200 rounded-xl p-4">
+                            <h3 className="text-sm font-semibold text-slate-700 mb-3">Import (CSV/JSON)</h3>
+                            <div className="flex flex-col gap-3">
+                                <select
+                                    value={importFormat}
+                                    onChange={(e) => setImportFormat(e.target.value as 'csv' | 'json')}
+                                    className="px-3 py-2 rounded-lg border border-slate-300 text-sm"
+                                >
+                                    <option value="csv">CSV</option>
+                                    <option value="json">JSON</option>
+                                </select>
+                                <input
+                                    type="file"
+                                    accept={importFormat === 'csv' ? '.csv,text/csv' : '.json,application/json'}
+                                    onChange={(e) => setImportFile(e.target.files?.[0] ?? null)}
+                                    className="text-sm text-slate-700"
+                                />
+                                <button
+                                    type="submit"
+                                    disabled={isImporting}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-60"
+                                >
+                                    {isImporting ? 'Importing...' : 'Run Import'}
+                                </button>
+                            </div>
+                        </form>
+
+                        <div className="border border-slate-200 rounded-xl p-4">
+                            <h3 className="text-sm font-semibold text-slate-700 mb-3">Export Inventory</h3>
+                            <div className="flex flex-col sm:flex-row gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => handleExportInventory('csv')}
+                                    disabled={isExporting}
+                                    className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-semibold hover:bg-slate-200 disabled:opacity-60"
+                                >
+                                    Export CSV
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleExportInventory('json')}
+                                    disabled={isExporting}
+                                    className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-semibold hover:bg-slate-200 disabled:opacity-60"
+                                >
+                                    Export JSON
+                                </button>
+                            </div>
+                            <p className="mt-3 text-xs text-slate-500">
+                                Export respects current active/inactive toggle.
+                            </p>
+                        </div>
+
+                        <div className="border border-slate-200 rounded-xl p-4">
+                            <h3 className="text-sm font-semibold text-slate-700 mb-3">Export Transactions</h3>
+                            <div className="flex flex-col sm:flex-row gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => handleExportTransactions('csv')}
+                                    disabled={isExporting}
+                                    className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-semibold hover:bg-slate-200 disabled:opacity-60"
+                                >
+                                    Export CSV
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleExportTransactions('json')}
+                                    disabled={isExporting}
+                                    className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-semibold hover:bg-slate-200 disabled:opacity-60"
+                                >
+                                    Export JSON
+                                </button>
+                            </div>
+                            <p className="mt-3 text-xs text-slate-500">
+                                Downloads customer order line-item history.
+                            </p>
+                        </div>
+                    </div>
+
+                    {(importMsg || exportMsg) && (
+                        <p className="mt-4 text-sm text-slate-600">
+                            {importMsg || exportMsg}
+                        </p>
+                    )}
+                </div>
 
                 {showAddForm && (
                     <form onSubmit={handleCreateItem} className="bg-white rounded-2xl shadow-sm p-6 border border-slate-200 mb-6">
                         <h2 className="text-lg font-semibold text-slate-800 mb-4">Add New Inventory Item</h2>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                            <input value={newItem.sku} onChange={(e) => setNewItem(prev => ({ ...prev, sku: e.target.value }))} placeholder="SKU" className="px-3 py-2 rounded-lg border border-slate-300" />
                             <input value={newItem.name} onChange={(e) => setNewItem(prev => ({ ...prev, name: e.target.value }))} placeholder="Name" className="px-3 py-2 rounded-lg border border-slate-300" />
                             <input value={newItem.category} onChange={(e) => setNewItem(prev => ({ ...prev, category: e.target.value }))} placeholder="Category" className="px-3 py-2 rounded-lg border border-slate-300" />
                             <input type="number" min="0" step="1" value={newItem.quantity} onChange={(e) => setNewItem(prev => ({ ...prev, quantity: e.target.value }))} placeholder="Quantity" className="px-3 py-2 rounded-lg border border-slate-300" />
@@ -279,8 +646,11 @@ function DashboardInner() {
 
                 {/* Items Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {items.slice(0, visibleCount).map((item) => (
-                        <div key={item.ItemID} className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col">
+                    {items.map((item) => (
+                        <div
+                            key={item.ItemID}
+                            className={`bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col ${item.IsSelling === 0 ? 'opacity-70' : ''}`}
+                        >
                             <div className="p-5 flex-grow">
                                 <div className="flex justify-between items-start mb-2">
                                     <h3 className="text-lg font-bold text-slate-900 leading-tight">{item.Name}</h3>
@@ -290,6 +660,11 @@ function DashboardInner() {
                                         <span className="bg-slate-100 text-slate-500 text-[10px] uppercase tracking-wider font-bold px-2 py-1 rounded-full">Unavailable</span>
                                     )}
                                 </div>
+                                {item.IsSelling === 0 && (
+                                    <span className="inline-flex bg-amber-100 text-amber-800 text-[10px] uppercase tracking-wider font-bold px-2 py-1 rounded-full">
+                                        Not for Sale
+                                    </span>
+                                )}
                                 <p className="text-xs text-slate-500 mt-1">SKU: {item.SKU}</p>
                                 <p className="text-xs text-slate-500 mt-1">Category: {item.Category || 'N/A'}</p>
                                 <p className="text-2xl font-semibold text-blue-600 mt-2">${Number(item.Price).toFixed(2)}</p>
@@ -318,9 +693,6 @@ function DashboardInner() {
                                             <button onClick={closeEdit} className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors">
                                                 Cancel
                                             </button>
-                                            <button onClick={() => handleSoftDisable(item.ItemID)} disabled={isSubmitting} className="text-xs font-semibold text-red-600 hover:text-red-700 transition-colors disabled:opacity-60">
-                                                Remove from Sale
-                                            </button>
                                         </div>
                                     </div>
                                 ) : (
@@ -333,10 +705,34 @@ function DashboardInner() {
                     ))}
                 </div>
 
-                {visibleCount < items.length && (
-                    <div className="mt-12 flex justify-center">
-                        <button onClick={loadMore} className="px-8 py-3 bg-white border border-slate-300 text-slate-700 font-semibold rounded-full hover:bg-slate-50 hover:border-slate-400 transition-all shadow-sm">
-                            Show More Items
+                {totalPages > 1 && (
+                    <div className="mt-10 flex justify-center items-center gap-2">
+                        <button
+                            onClick={() => goToPage(page - 1)}
+                            disabled={page <= 1}
+                            className="px-4 py-2 bg-white border border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-50 hover:border-slate-400 transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                            Previous
+                        </button>
+                        {pageWindow.map((p) => (
+                            <button
+                                key={p}
+                                onClick={() => goToPage(p)}
+                                className={`px-4 py-2 rounded-lg font-semibold transition-all shadow-sm border ${
+                                    p === page
+                                        ? 'bg-blue-600 text-white border-blue-600'
+                                        : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50 hover:border-slate-400'
+                                }`}
+                            >
+                                {p}
+                            </button>
+                        ))}
+                        <button
+                            onClick={() => goToPage(page + 1)}
+                            disabled={page >= totalPages}
+                            className="px-4 py-2 bg-white border border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-50 hover:border-slate-400 transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                            Next
                         </button>
                     </div>
                 )}
@@ -346,6 +742,39 @@ function DashboardInner() {
                         <p className="text-slate-400">Searching the warehouse for items...</p>
                     </div>
                 )}
+
+                {/* Item Requests */}
+                <div className="mt-12">
+                    <h2 className="text-2xl font-extrabold text-white mb-4 tracking-tight">Customer Item Requests</h2>
+                    {reqLoading && (
+                        <div className="bg-white rounded-2xl shadow-sm p-8 text-center border border-slate-200">
+                            <div className="w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto" />
+                        </div>
+                    )}
+                    {!reqLoading && itemRequests.length === 0 && (
+                        <div className="bg-white rounded-2xl shadow-sm p-8 text-center border border-slate-200">
+                            <p className="text-slate-400">No item requests yet.</p>
+                        </div>
+                    )}
+                    {!reqLoading && itemRequests.length > 0 && (
+                        <div className="flex flex-col gap-3">
+                            {itemRequests.map(req => (
+                                <div key={req.ID} className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+                                    <div className="flex items-start justify-between gap-4">
+                                        <div>
+                                            <p className="font-bold text-slate-900">{req.Name}</p>
+                                            <p className="text-xs text-slate-400 mt-0.5">{req.CustomerEmail}</p>
+                                            {req.Description && (
+                                                <p className="text-sm text-slate-600 mt-2">{req.Description}</p>
+                                            )}
+                                        </div>
+                                        <span className="text-xs text-slate-400 shrink-0">#{req.ID}</span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );

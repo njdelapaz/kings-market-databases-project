@@ -51,8 +51,13 @@ export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const format = String(searchParams.get('format') || 'json').toLowerCase();
-    const storekeeperEmail = request.headers.get('x-user-email');
+    const storekeeperEmail =
+      String(searchParams.get('storekeeperEmail') || request.headers.get('x-user-email') || '').trim();
+    const role = request.headers.get('x-user-role');
 
+    if (role && role !== 'storekeeper') {
+      return NextResponse.json({ success: false, message: 'Forbidden.' }, { status: 403 });
+    }
     if (!storekeeperEmail) {
       return NextResponse.json({ success: false, message: 'Unauthorized.' }, { status: 401 });
     }

@@ -20,6 +20,7 @@ type ReportData = {
     ItemID: number;
     ItemName: string | null;
     Action: string;
+    ActionLabel?: string;
     Timestamp: string;
   }>;
   transactionSummary: {
@@ -171,7 +172,7 @@ function StorekeeperReportsInner() {
                 {(report?.recentInventoryUpdates || []).map((event, idx) => (
                   <tr key={`${event.ItemID}-${idx}`} className="border-b border-slate-100 text-slate-700">
                     <td className="py-2 pr-4">{event.ItemName || `Item ${event.ItemID}`}</td>
-                    <td className="py-2 pr-4">{event.Action}</td>
+                    <td className="py-2 pr-4">{event.ActionLabel || event.Action}</td>
                     <td className="py-2 pr-4">{event.StorekeeperEmail}</td>
                     <td className="py-2 pr-4">{new Date(event.Timestamp).toLocaleString()}</td>
                   </tr>
