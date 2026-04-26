@@ -65,9 +65,9 @@ function DashboardInner() {
         price: '0',
         isSelling: true,
     });
-    const params = useSearchParams();
+    const searchParams = useSearchParams();
     const router = useRouter();
-    const storekeeperEmail = params.get('email') ?? '';
+    const storekeeperEmail = searchParams.get('email') ?? '';
     const pageSize = 12;
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
@@ -403,23 +403,26 @@ function DashboardInner() {
                 {/* Header Card */}
                 <div className="bg-white rounded-2xl shadow-sm p-8 border border-slate-200 mb-8 flex justify-between">
                     <h1 className="mt-2 p-3 text-slate-600">
-                        Hey <span className="font-semibold text-blue-600">{params.get('name')}</span>!
+                        Hey <span className="font-semibold text-blue-600">{searchParams.get('name')}</span>!
                     </h1>
                     <div className="flex justify-between gap-1">
-                        <button
-                            onClick={() => {
-                                setShowInactive(prev => !prev);
-                                setPage(1);
-                            }}
-                            className='mt-2 p-3 font-semibold text-blue-500 hover:bg-slate-50 hover:text-black rounded-2xl cursor-pointer'
-                        >
-                            {showInactive ? 'Hide Inactive' : 'Show Inactive'}
-                        </button>
                         <button
                             onClick={() => setShowAddForm(prev => !prev)}
                             className='mt-2 p-3 font-semibold text-blue-500 hover:bg-slate-50 hover:text-black rounded-2xl cursor-pointer'
                         >
                             Add New Item
+                        </button>
+                        <button
+                            onClick={() => router.push(`/storekeeper/orders?name=${encodeURIComponent(searchParams.get('name') || '')}&email=${encodeURIComponent(storekeeperEmail)}`)}
+                            className='mt-2 p-3 font-semibold text-blue-500 hover:bg-slate-50 hover:text-black rounded-2xl cursor-pointer'
+                        >
+                            Orders
+                        </button>
+                        <button
+                            onClick={() => router.push(`/storekeeper/create-account?name=${encodeURIComponent(searchParams.get('name') || '')}&email=${encodeURIComponent(storekeeperEmail)}`)}
+                            className='mt-2 p-3 font-semibold text-blue-500 hover:bg-slate-50 hover:text-black rounded-2xl cursor-pointer'
+                        >
+                            Create Storekeeper
                         </button>
                         <button
                             onClick={() => router.push('/storekeeper/item-requests')}
@@ -428,7 +431,7 @@ function DashboardInner() {
                             Item Requests
                         </button>
                         <button
-                            onClick={() => router.push(`/storekeeper/reports?name=${encodeURIComponent(params.get('name') || '')}&email=${encodeURIComponent(storekeeperEmail)}`)}
+                            onClick={() => router.push(`/storekeeper/reports?name=${encodeURIComponent(searchParams.get('name') || '')}&email=${encodeURIComponent(storekeeperEmail)}`)}
                             className='mt-2 p-3 font-semibold text-blue-500 hover:bg-slate-50 hover:text-black rounded-2xl cursor-pointer'
                         >
                             Reports
@@ -524,7 +527,17 @@ function DashboardInner() {
                             Clear filters
                         </button>
                     </div>
-                    <div className="md:col-span-12 flex justify-end">
+                    <div className="md:col-span-12 flex justify-end gap-2">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setShowInactive(prev => !prev);
+                                setPage(1);
+                            }}
+                            className="px-5 py-2 bg-slate-100 text-slate-700 font-semibold rounded-lg hover:bg-slate-200 transition"
+                        >
+                            {showInactive ? 'Hide Inactive' : 'Show Inactive'}
+                        </button>
                         <button type="submit" className="px-5 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition">
                             Apply Search
                         </button>
