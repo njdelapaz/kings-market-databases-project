@@ -222,7 +222,7 @@ export default function Cart(){
                 location.reload();
             }
             else{
-                setErrorState(data.error)
+                setErrorState(typeof data.error === 'string' ? data.error : 'Failed to save payment info. Please try again.')
             }
         }
         else{
