@@ -60,6 +60,7 @@ function DashboardInner() {
     const params     = useSearchParams();
     const router     = useRouter();
     const pathname   = usePathname();
+    const [checkoutSuccess, setCheckoutSuccess] = useState(false);
 
     // URL-driven filter state. We read from search params so /customer?q=rice&...
     // is shareable and refresh-safe, then push updates back to the URL whenever
@@ -197,6 +198,14 @@ function DashboardInner() {
             .catch(() => {});
     }, []);
 
+    useEffect(() => {
+        if(localStorage.getItem('checkoutSuccess') === 'true'){
+            setCheckoutSuccess(true);
+            localStorage.removeItem('checkoutSuccess');
+            setTimeout(() => setCheckoutSuccess(false), 3000)
+        }
+    }, [])
+
     async function handleCart(item: Item) {
         if (item.stockStatus === 'out_of_stock') return;
         try {
@@ -295,6 +304,7 @@ function DashboardInner() {
 
     return (
         <div className="min-h-screen bg-indigo-600 p-4 md:p-8">
+            
             {alert.show && (
                 <div className="fixed top-5 right-5 z-50 animate-fade-in-down">
                     <div className="flex items-center p-4 mb-4 text-sm text-blue-800 rounded-lg bg-blue-50 border border-blue-200 shadow-lg" role="alert">
@@ -316,6 +326,20 @@ function DashboardInner() {
             )}
 
             <div className="max-w-6xl mx-auto">
+                {checkoutSuccess && (
+                    <div className='bg-green-50 border border-green-200 text-green-700 font-normal px-6 py-4 rounded-2xl mb-6 flex items-center justify-between'>
+                        Order placed successfully!
+                        <button
+                            onClick={() => setCheckoutSuccess(false)}
+                            className="bg-green-50 text-green-700 rounded-lg focus:ring-2 focus:ring-green-400 p-1.5 hover:bg-green-100 inline-flex items-center justify-center h-8 w-8"
+                        >
+                            <span className="sr-only">Close</span>
+                            <svg className="w-4 h-4" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18 17.94 6M18 18 6.06 6" />
+                            </svg>
+                        </button>
+                    </div>
+                )}
                 {/* Header */}
                 <div className="bg-white rounded-2xl shadow-sm p-8 border border-slate-200 mb-6 flex justify-between">
                     <h1 className="mt-2 p-3 text-slate-600">
