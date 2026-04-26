@@ -18,14 +18,9 @@ export async function GET(request){
             FROM UpdateCart uc
             JOIN Item_R1 i ON uc.ItemID = i.ItemID
             WHERE uc.CustomerEmail = ?
-            AND uc.Timestamp > COALESCE(
-                (SELECT MAX(uc2.Timestamp) FROM UpdateCart uc2
-                WHERE uc2.CustomerEmail = ? AND uc2.Action = 'Clear'),
-                '1970-01-01'
-            )
             GROUP BY uc.ItemID, i.Name, i.Price
             HAVING TotalQuantity > 0`,
-            [CustomerEmail, CustomerEmail]
+            [CustomerEmail]
         );
         if(rows.length > 0){
             return NextResponse.json({ success: true, cart: rows });
@@ -39,19 +34,74 @@ export async function GET(request){
     }
 }
 
+export async function DELETE(request){
+    const CustomerEmail = request.headers.get('x-user-email');
+    const { searchParams } = new URL(request.url);
+    const itemID = searchParams.get('itemID');
+
+    try{
+        if (itemID) {
+            await db.query(
+                `DELETE FROM UpdateCart WHERE CustomerEmail = ? AND ItemID = ?`,
+                [CustomerEmail, itemID]
+            );
+        } else {
+            await db.query(
+                `DELETE FROM UpdateCart WHERE CustomerEmail = ?`,
+                [CustomerEmail]
+            );
+        }
+        return NextResponse.json({ success: true });
+    }
+    catch(err){
+        console.error('Cart DELETE error:', err);
+        return NextResponse.json({ error: 'Internal server error.' }, { status: 500 });
+    }
+}
+
 export async function POST(request){
     const CustomerEmail = request.headers.get('x-user-email');
-    const { itemID, action, timestamp } = await request.json();
+    const { itemID, action, quantity = 1 } = await request.json();
 
     if (!itemID || !action) {
         return NextResponse.json({ error: 'itemID and action are required.' }, { status: 400 });
     }
 
+    const count = Math.max(1, Math.floor(Number(quantity)));
+
     try{
-        await db.query(
-            `INSERT INTO UpdateCart (ItemID, CustomerEmail, Action, Timestamp) VALUES (?, ?, ?, ?)`,
-            [itemID, CustomerEmail, action, timestamp]
-        );
+        if (action === 'Add') {
+            const [[item], [cartRows]] = await Promise.all([
+                db.query(`SELECT Quantity FROM Item_R1 WHERE ItemID = ?`, [itemID]),
+                db.query(
+                    `SELECT SUM(CASE WHEN Action = 'Add' THEN 1 WHEN Action = 'Remove' THEN -1 ELSE 0 END) AS CartQty
+                     FROM UpdateCart WHERE CustomerEmail = ? AND ItemID = ?`,
+                    [CustomerEmail, itemID]
+                ),
+            ]);
+
+            if (!item.length) {
+                return NextResponse.json({ error: 'Item not found.' }, { status: 404 });
+            }
+
+            const stock = item[0].Quantity;
+            const cartQty = Number(cartRows[0].CartQty) || 0;
+
+            if (cartQty + count > stock) {
+                return NextResponse.json(
+                    { error: `Only ${stock} in stock${cartQty > 0 ? ` and you already have ${cartQty} in your cart` : ''}.` },
+                    { status: 409 }
+                );
+            }
+        }
+
+        for (let i = 0; i < count; i++) {
+            await db.query(
+                `INSERT INTO UpdateCart (ItemID, CustomerEmail, Action, Timestamp) VALUES (?, ?, ?, NOW(6))`,
+                [itemID, CustomerEmail, action]
+            );
+        }
+
         return NextResponse.json({ success: true, message: 'Cart updated successfully!' });
     }
     catch(err){

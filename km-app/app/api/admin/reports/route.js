@@ -10,8 +10,7 @@ function buildStorekeeperFilter(storekeeperEmail, tableAlias = 'ado') {
 
 export async function GET(request) {
   try {
-    const { searchParams } = new URL(request.url);
-    const storekeeperEmail = String(searchParams.get('storekeeperEmail') || '').trim();
+    const storekeeperEmail = request.headers.get('x-user-email') || '';
 
     const opFilter = buildStorekeeperFilter(storekeeperEmail, 'ado');
     const invFilter = buildStorekeeperFilter(storekeeperEmail, 'ui');

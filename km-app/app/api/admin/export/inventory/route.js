@@ -42,10 +42,10 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const format = String(searchParams.get('format') || 'json').toLowerCase();
     const includeInactive = searchParams.get('includeInactive') === 'true';
-    const storekeeperEmail = String(searchParams.get('storekeeperEmail') || '').trim();
+    const storekeeperEmail = request.headers.get('x-user-email');
 
     if (!storekeeperEmail) {
-      return NextResponse.json({ success: false, message: 'storekeeperEmail is required.' }, { status: 400 });
+      return NextResponse.json({ success: false, message: 'Unauthorized.' }, { status: 401 });
     }
     if (!['csv', 'json'].includes(format)) {
       return NextResponse.json({ success: false, message: 'format must be csv or json.' }, { status: 400 });

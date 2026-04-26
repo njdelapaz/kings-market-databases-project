@@ -94,15 +94,16 @@ export async function POST(request) {
   let operationId = null;
 
   try {
+    const storekeeperEmail = request.headers.get('x-user-email');
+    if (!storekeeperEmail) {
+      return NextResponse.json({ success: false, message: 'Unauthorized.' }, { status: 401 });
+    }
+
     const body = await request.json();
     const format = String(body?.format || '').toLowerCase();
     const content = body?.content;
     const sourceFilename = body?.filename ? String(body.filename).trim() : null;
-    const storekeeperEmail = String(body?.storekeeperEmail || '').trim();
 
-    if (!storekeeperEmail) {
-      return NextResponse.json({ success: false, message: 'storekeeperEmail is required.' }, { status: 400 });
-    }
     if (!['csv', 'json'].includes(format)) {
       return NextResponse.json({ success: false, message: 'format must be csv or json.' }, { status: 400 });
     }
