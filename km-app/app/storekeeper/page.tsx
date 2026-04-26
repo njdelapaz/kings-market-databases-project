@@ -429,13 +429,13 @@ function DashboardInner() {
                             Add New Item
                         </button>
                         <button
-                            onClick={() => router.push(`/storekeeper/orders?name=${encodeURIComponent(params.get('name') || '')}&email=${encodeURIComponent(storekeeperEmail)}`)}
+                            onClick={() => router.push(`/storekeeper/orders?name=${encodeURIComponent(storekeeperName || '')}&email=${encodeURIComponent(storekeeperEmail)}`)}
                             className='mt-2 p-3 font-semibold text-blue-500 hover:bg-slate-50 hover:text-black rounded-2xl cursor-pointer'
                         >
                             Orders
                         </button>
                         <button
-                            onClick={() => router.push(`/storekeeper/create-account?name=${encodeURIComponent(params.get('name') || '')}&email=${encodeURIComponent(storekeeperEmail)}`)}
+                            onClick={() => router.push(`/storekeeper/create-account?name=${encodeURIComponent(storekeeperName || '')}&email=${encodeURIComponent(storekeeperEmail)}`)}
                             className='mt-2 p-3 font-semibold text-blue-500 hover:bg-slate-50 hover:text-black rounded-2xl cursor-pointer'
                         >
                             Create Storekeeper
@@ -447,7 +447,7 @@ function DashboardInner() {
                             Item Requests
                         </button>
                         <button
-                            onClick={() => router.push('/storekeeper/reports')}
+                            onClick={() => router.push(`/storekeeper/reports?name=${encodeURIComponent(storekeeperName || '')}&email=${encodeURIComponent(storekeeperEmail)}`)}
                             className='mt-2 p-3 font-semibold text-blue-500 hover:bg-slate-50 hover:text-black rounded-2xl cursor-pointer'
                         >
                             Reports
