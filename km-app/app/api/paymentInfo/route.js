@@ -21,3 +21,28 @@ export async function POST(request){
         return NextResponse.json({ error: 'Internal server error.' }, { status: 500 });
     }
 }
+
+export async function PUT(request){
+    try{
+        const {customerEmail, type, provider, last4, expMonth, expYear} = await request.json();
+        // need the values(type), values(provider), etc because of the "on duplicate key update" instruction.
+        await db.query(
+            `INSERT INTO PaymentInfo (CustomerEmail, Type, Provider, Last4, ExpMonth, ExpYear) 
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+            Type=VALUES(Type),
+            Provider=VALUES(Provider),
+            Last4=VALUES(Last4),
+            ExpMonth=VALUES(ExpMonth),
+            ExpYear=VALUES(ExpYear)`,
+            [customerEmail, type, provider, last4, expMonth, expYear]
+        )
+        return NextResponse.json({ success: true, message: 'Payment Info Added Successfully!' });
+
+    } catch(err){
+        console.error("Payment Info Addition errored out. Error is: ", err);
+        return NextResponse.json({ error: err}, { status: 500 });
+    }
+    
+    
+}
