@@ -35,16 +35,20 @@ export async function POST(request) {
         await conn.query('CALL place_order_from_tempcart(?, @new_order_id)', [customerEmail]);
         const [[{ orderId }]] = await conn.query('SELECT @new_order_id AS orderId');
 
-        const now = new Date();
-        // UpdateCart has a composite PK including Timestamp, so writing one
-        // row per unit can collide at high speed. Log one deterministic
-        // removal event per item for checkout.
+        // Cart is event-sourced from UpdateCart (+1 Add / -1 Remove). For checkout,
+        // we must emit one Remove event per purchased unit so cart reconstruction
+        // reaches zero. We keep timestamps unique to satisfy the composite PK.
+        let tsOffsetMicros = 0;
         for (const item of cartItems) {
-            await conn.query(
-                `INSERT INTO UpdateCart (CustomerEmail, ItemID, Action, Timestamp)
-                 VALUES (?, ?, 'Remove', ?)`,
-                [customerEmail, item.ItemID, now]
-            );
+            const qty = Math.max(1, Number(item.TotalQuantity) || 1);
+            for (let i = 0; i < qty; i += 1) {
+                await conn.query(
+                    `INSERT INTO UpdateCart (CustomerEmail, ItemID, Action, Timestamp)
+                     VALUES (?, ?, 'Remove', DATE_ADD(NOW(6), INTERVAL ? MICROSECOND))`,
+                    [customerEmail, item.ItemID, tsOffsetMicros]
+                );
+                tsOffsetMicros += 1;
+            }
         }
 
         await conn.commit();
