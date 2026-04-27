@@ -81,6 +81,7 @@ function DashboardInner() {
     const [maxDraft,    setMaxDraft]    = useState(urlMax);
 
     const [items,        setItems]        = useState<Item[]>([]);
+    const [cartQtyByItem, setCartQtyByItem] = useState<Record<number, number>>({});
     const [total,        setTotal]        = useState(0);
     const [categories,   setCategories]   = useState<Category[]>([]);
     const [loading,      setLoading]      = useState(false);
@@ -90,6 +91,37 @@ function DashboardInner() {
     const [username, setUsername] = useState('');
 
     const totalPages = Math.max(1, Math.ceil(total / urlPageSize));
+
+    const getEffectiveQty = useCallback(
+        (item: Item) => Math.max(0, item.Quantity - (cartQtyByItem[item.ItemID] ?? 0)),
+        [cartQtyByItem]
+    );
+
+    const getEffectiveStockStatus = useCallback(
+        (item: Item): StockStatus => {
+            const effectiveQty = getEffectiveQty(item);
+            if (effectiveQty <= 0) return 'out_of_stock';
+            if (effectiveQty <= 5) return 'low_stock';
+            return 'in_stock';
+        },
+        [getEffectiveQty]
+    );
+
+    const refreshCartQuantities = useCallback(async () => {
+        try {
+            const res = await fetch('/api/cart');
+            const data = await res.json();
+            if (!data.success) return;
+
+            const nextMap = (data.cart ?? []).reduce((acc: Record<number, number>, row: { ItemID: number; TotalQuantity: number }) => {
+                acc[row.ItemID] = Number(row.TotalQuantity) || 0;
+                return acc;
+            }, {});
+            setCartQtyByItem(nextMap);
+        } catch (err) {
+            console.error('Failed to refresh cart quantities:', err);
+        }
+    }, []);
 
     // Build the next URL while preserving filter/sort/page params.
     const buildUrl = useCallback(
@@ -199,6 +231,10 @@ function DashboardInner() {
     }, []);
 
     useEffect(() => {
+        refreshCartQuantities();
+    }, [refreshCartQuantities]);
+
+    useEffect(() => {
         if(localStorage.getItem('checkoutSuccess') === 'true'){
             setCheckoutSuccess(true);
             localStorage.removeItem('checkoutSuccess');
@@ -223,15 +259,10 @@ function DashboardInner() {
             });
             const data = await res.json();
             if (data.success) {
-                // Optimistic UI decrement so the badge reacts immediately.
-                // Real stock is refreshed from the server on next catalog fetch.
-                setItems(prev =>
-                    prev.map(p =>
-                        p.ItemID === item.ItemID
-                            ? { ...p, Quantity: Math.max(0, p.Quantity - 1) }
-                            : p
-                    )
-                );
+                setCartQtyByItem(prev => ({
+                    ...prev,
+                    [item.ItemID]: (prev[item.ItemID] ?? 0) + 1,
+                }));
                 setAlert({ show: true, itemName: item.Name });
                 setTimeout(() => setAlert({ show: false, itemName: '' }), 3000);
             }
@@ -445,7 +476,9 @@ function DashboardInner() {
                 {/* Items Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                     {items.map((item) => {
-                        const isOut = item.stockStatus === 'out_of_stock';
+                        const effectiveQty = getEffectiveQty(item);
+                        const effectiveStatus = getEffectiveStockStatus(item);
+                        const isOut = effectiveStatus === 'out_of_stock';
                         return (
                             <div
                                 key={item.ItemID}
@@ -459,7 +492,7 @@ function DashboardInner() {
                                         >
                                             {item.Name}
                                         </Link>
-                                        <StockBadge status={item.stockStatus} quantity={item.Quantity} />
+                                        <StockBadge status={effectiveStatus} quantity={effectiveQty} />
                                     </div>
                                     {item.Category && (
                                         <p className="text-xs text-slate-500 mt-1">{item.Category}</p>
@@ -471,7 +504,7 @@ function DashboardInner() {
 
                                 <div className="bg-slate-50 px-5 py-3 border-t border-slate-100 flex justify-between items-center">
                                     <span className="text-sm text-slate-500 font-medium">
-                                        Quantity: <span className="text-slate-900">{item.Quantity}</span>
+                                        Quantity: <span className="text-slate-900">{effectiveQty}</span>
                                     </span>
                                     <button
                                         className={`text-sm font-semibold transition-colors ${
