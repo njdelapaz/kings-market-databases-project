@@ -3,6 +3,8 @@
 Kings Market is a Database Systems course project that implements a grocery pre-order and pickup workflow.
 It is designed to show how relational modeling, integrity constraints, and advanced SQL can drive real features in a full-stack app.
 
+Live GCP link: https://kings-market-app-1078601567030.us-east4.run.app/
+
 <img width="1512" height="823" alt="image" src="https://github.com/user-attachments/assets/e5ad9089-f270-45cd-b242-3f460e2182bb" />
 
 &nbsp;
