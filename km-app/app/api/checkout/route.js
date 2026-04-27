@@ -22,7 +22,7 @@ export async function POST(request) {
         const cartItems = Object.values(cart);
         await conn.beginTransaction();
 
-        await conn.query('DELETE FROM TempCart WHERE CustomerEmail = ?', [customerEmail]);
+        await conn.query('DELETE FROM TempCart WHERE BINARY CustomerEmail = BINARY ?', [customerEmail]);
         for (const item of cartItems) {
             await conn.query(
                 `INSERT INTO TempCart (CustomerEmail, ItemID, Quantity)
@@ -58,6 +58,15 @@ export async function POST(request) {
                 {
                     success: false,
                     error: 'Advanced checkout SQL is not installed. Run migration 014_advanced_sql_order_workflow.sql.',
+                },
+                { status: 409 }
+            );
+        }
+        if (typeof err?.message === 'string' && err.message.includes('Illegal mix of collations')) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: 'Checkout SQL collation mismatch. Run migration 015_fix_checkout_collation_mismatch.sql.',
                 },
                 { status: 409 }
             );
