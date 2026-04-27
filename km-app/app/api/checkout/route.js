@@ -36,14 +36,15 @@ export async function POST(request) {
         const [[{ orderId }]] = await conn.query('SELECT @new_order_id AS orderId');
 
         const now = new Date();
+        // UpdateCart has a composite PK including Timestamp, so writing one
+        // row per unit can collide at high speed. Log one deterministic
+        // removal event per item for checkout.
         for (const item of cartItems) {
-            for (let i = 0; i < item.TotalQuantity; i += 1) {
-                await conn.query(
-                    `INSERT INTO UpdateCart (CustomerEmail, ItemID, Action, Timestamp)
-                     VALUES (?, ?, 'Remove', ?)`,
-                    [customerEmail, item.ItemID, now]
-                );
-            }
+            await conn.query(
+                `INSERT INTO UpdateCart (CustomerEmail, ItemID, Action, Timestamp)
+                 VALUES (?, ?, 'Remove', ?)`,
+                [customerEmail, item.ItemID, now]
+            );
         }
 
         await conn.commit();
