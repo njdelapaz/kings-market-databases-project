@@ -56,8 +56,11 @@ export default function Orders(){
     const [totalPages, setTotalPages] = useState(1);
     const [total,      setTotal]      = useState(0);
 
-    const fetchOrders = useCallback(async (p: number) => {
-        setLoading(true);
+    const fetchOrders = useCallback(async (p: number, opts?: { silent?: boolean }) => {
+        const silent = Boolean(opts?.silent);
+        if (!silent) {
+            setLoading(true);
+        }
         setErrorMsg('');
         try {
             const res  = await fetch(`/api/orders?page=${p}&limit=${PAGE_SIZE}`);
@@ -68,14 +71,18 @@ export default function Orders(){
                 setPage(data.page);
                 setTotalPages(data.totalPages);
                 setTotal(data.total);
-                setOpenOrd(null);
+                if (!silent) {
+                    setOpenOrd(null);
+                }
             } else {
                 setErrorMsg(data.error || 'Failed to load orders.');
             }
         } catch {
             setErrorMsg('Network error. Please try again.');
         } finally {
-            setLoading(false);
+            if (!silent) {
+                setLoading(false);
+            }
         }
     }, [router]);
 
@@ -83,7 +90,7 @@ export default function Orders(){
 
     useEffect(() => {
         const timer = setInterval(() => {
-            fetchOrders(page);
+            fetchOrders(page, { silent: true });
         }, 10000);
         return () => clearInterval(timer);
     }, [fetchOrders, page]);
