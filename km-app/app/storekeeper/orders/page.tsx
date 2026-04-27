@@ -76,8 +76,11 @@ function StorekeeperOrdersInner() {
     return pages;
   }, [page, totalPages]);
 
-  const fetchOrders = useCallback(async (nextPage: number) => {
-    setLoading(true);
+  const fetchOrders = useCallback(async (nextPage: number, opts?: { silent?: boolean }) => {
+    const silent = Boolean(opts?.silent);
+    if (!silent) {
+      setLoading(true);
+    }
     setErrorMsg('');
     try {
       const res = await fetch(`/api/admin/orders?page=${nextPage}&pageSize=${PAGE_SIZE}`);
@@ -111,7 +114,9 @@ function StorekeeperOrdersInner() {
       console.error(error);
       setErrorMsg('Failed to load orders.');
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -121,7 +126,7 @@ function StorekeeperOrdersInner() {
 
   useEffect(() => {
     const timer = setInterval(() => {
-      fetchOrders(page);
+      fetchOrders(page, { silent: true });
     }, 10000);
     return () => clearInterval(timer);
   }, [fetchOrders, page]);
