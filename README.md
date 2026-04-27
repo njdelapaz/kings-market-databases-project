@@ -5,6 +5,11 @@ It is designed to show how relational modeling, integrity constraints, and advan
 
 Live GCP link: https://kings-market-app-1078601567030.us-east4.run.app/
 
+**Preset Storekeeper Credentials for Testing:** \
+username: johnstorekeeper \
+email: storekeeper1@gmail.com \
+password: Password
+
 <img width="1512" height="823" alt="image" src="https://github.com/user-attachments/assets/e5ad9089-f270-45cd-b242-3f460e2182bb" />
 
 &nbsp;
